@@ -50,9 +50,9 @@ class NormalWishartPrior(NormalDiagonalWishart):
     def expected_entropy(self):
         mvdigamma_term = mvdigamma(0.5 * self.df, self.dimensionality)
         return 0.5 * (
-            self.dimensionality * (1 + math.log(2 * math.pi))
-            - (2 * self.precision_diag).log().sum(dim=-1)
-            - mvdigamma_term
+            self.dimensionality * (1 + math.log(2 * math.pi)) -
+            (2 * self.precision_diag).log().sum(dim=-1) -
+            mvdigamma_term
         )
 
     def expected_log_prob(self, value):
