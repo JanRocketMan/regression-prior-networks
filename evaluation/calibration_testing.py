@@ -21,19 +21,26 @@ def evaluate_distributions(
         with torch.no_grad():
             # Compute results
             pred_dist = model(inputs[i].unsqueeze(0).to(device))
+
             if isinstance(pred_dist, NormalWishartPrior):
                 # Infer posterior t-distribution from a prior prediction
                 pred_dist = pred_dist.forward()
+                pred_dist = renorm_distribution(pred_dist)
+                pred_dist = Normal(
+                    pred_dist.mean,
+                    pred_dist.variance.pow(0.5)
+                )
             elif isinstance(pred_dist, GaussianDiagonalMixture):
                 # Approximate ensemble with a single Gaussian
+                pred_dist = renorm_distribution(pred_dist)
                 pred_dist = Normal(
                     pred_dist.expected_mean(),
                     pred_dist.total_variance().pow(0.5)
                 )
+            else:
+                pred_dist = renorm_distribution(pred_dist)
 
-        dists_list.append(
-            renorm_distribution(pred_dist)
-        )
+        dists_list.append(pred_dist)
 
     return dists_list
 
@@ -108,27 +115,27 @@ def get_calibration_metrics(args):
     if isinstance(dists[0], Normal):
         est_dist_params = {
             'mean': np.concatenate(
-                [dist.mean.reshape((-1, 320)) for dist in dists]
+                [dist.mean.reshape(-1) for dist in dists]
             ),
             'scale': np.concatenate(
-                [dist.stddev.reshape((-1, 320)) for dist in dists]
+                [dist.stddev.reshape(-1) for dist in dists]
             )
         }
     else:
         est_dist_params = {
             'mean': np.concatenate(
-                [dist.loc.reshape((-1, 320)) for dist in dists]
+                [dist.loc.reshape(-1) for dist in dists]
             ),
             'df': np.concatenate(
-                [dist.df.reshape((-1, 320)) for dist in dists]
+                [dist.df.reshape(-1) for dist in dists]
             ),
             'scale': np.concatenate(
-                [dist.variance.pow(0.5).reshape((-1, 320)) for dist in dists]
+                [dist.variance.pow(0.5).reshape(-1) for dist in dists]
             )
         }
 
     calibr_curve = calculate_calibration_intervals(
-        targets.reshape((-1, 320)).numpy(), est_dist_params
+        targets.reshape(-1).numpy(), est_dist_params
     )
 
     print("C-AUC score: %.3f" % calculate_diff_auc(calibr_curve))

@@ -66,21 +66,36 @@ def InvertDepthNorm(
         return (10 ** depth) * minDepth
 
 
+def renorm_param(
+    param, maxDepth=1000.0, minDepth=10,
+    transform_type='scaled', clip=False
+):
+    renormed_param = InvertDepthNorm(
+        param, maxDepth=maxDepth, minDepth=minDepth,
+        transform_type=transform_type
+    ) / maxDepth
+    if clip:
+        renormed_param = np.clip(renormed_param, minDepth / maxDepth, 1.0)
+    return renormed_param
+
+
 def renorm_distribution(
     dist, maxDepth=1000.0, minDepth=10, transform_type='scaled'
 ):
     """Renormalizes distribution parameters back to targets space"""
-    dist.loc = np.clip(
-        InvertDepthNorm(
-            dist.loc, maxDepth=maxDepth, minDepth=minDepth,
-            transform_type=transform_type
-        ), minDepth, maxDepth
-    ) / maxDepth
+    if hasattr(dist, 'distributions'):
+        for i in range(len(dist.distributions)):
+            dist.distributions[i] = renorm_distribution(
+                dist.distributions[i], maxDepth, minDepth, transform_type
+            )
+    else:
+        dist.loc = renorm_param(
+            dist.loc, maxDepth, minDepth, transform_type, True
+        )
 
-    dist.scale = InvertDepthNorm(
-        dist.scale, maxDepth=maxDepth, minDepth=minDepth,
-        transform_type=transform_type
-    ) / maxDepth
+        dist.scale = renorm_param(
+            dist.scale, maxDepth, minDepth, transform_type, True
+        )
 
     return dist
 
