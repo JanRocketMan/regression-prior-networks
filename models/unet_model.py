@@ -38,11 +38,11 @@ class UpSample(nn.Sequential):
 
 class Decoder(nn.Module):
     def __init__(
-        self, backbone: str, decoder_width=1.0, probabilistic=False,
-        out_channels=1
+        self, backbone: str, decoder_width=1.0, out_channels=1
     ):
         super(Decoder, self).__init__()
         self.backbone = backbone
+        self.out_channels = out_channels
         in_features = {
             'resnet18': 512,
             'densenet169': 1664
@@ -69,7 +69,6 @@ class Decoder(nn.Module):
             output_features=features//16
         )
 
-        self.probabilistic = probabilistic
         self.conv3 = nn.Conv2d(
             features//16, out_channels,
             kernel_size=3, stride=1, padding=1
@@ -90,7 +89,7 @@ class Decoder(nn.Module):
         x_d3 = self.up3(x_d2, x_block1)
         x_d4 = self.up4(x_d3, x_block0)
         x_d5 = self.conv3(x_d4)
-        if self.probabilistic:
+        if self.out_channels > 1:
             params = x_d5.split(1, dim=1)
             return params
         else:
@@ -122,20 +121,16 @@ class Encoder(nn.Module):
 class UNetModel(nn.Module):
     def __init__(
         self, backbone: str, pretrained=True,
-        probabilistic=False, out_channels=1
+        out_channels=1
     ):
         """UNet-like model for MDE based on DenseDepth architecture
         (https://arxiv.org/abs/1812.11941)
         """
         super(UNetModel, self).__init__()
         self.encoder = Encoder(backbone, pretrained=pretrained)
-        if probabilistic and (out_channels == 1):
-            out_channels = 2
         self.decoder = Decoder(
-            backbone, probabilistic=probabilistic,
-            out_channels=out_channels
+            backbone, out_channels=out_channels
         )
-        self.probabilistic = probabilistic
 
     def forward(self, x):
         return self.decoder(self.encoder(x))
@@ -144,11 +139,11 @@ class UNetModel(nn.Module):
 def test_densedepth():
     print("Testing DenseDepth Normal-Wishart model...")
     denseDepth_model = UNetModel(
-        'densenet169', probabilistic=True, out_channels=3
+        'densenet169', out_channels=3
     )
     ex_inp = torch.randn(8, 3, 480, 640)
 
-    from distributions.dist_wrappers import ProbabilisticWrapper
+    from distributions.distribution_wrappers import ProbabilisticWrapper
     from distributions.nw_prior import NormalWishartPrior
 
     wrapper = ProbabilisticWrapper(NormalWishartPrior, denseDepth_model)
@@ -157,9 +152,9 @@ def test_densedepth():
     print("Passed")
 
     print("Testing DenseDepth ensemble of Gaussian models...")
-    from distributions.dist_wrappers import GaussianEnsembleWrapper
+    from distributions.distribution_wrappers import GaussianEnsembleWrapper
     wrapper = GaussianEnsembleWrapper(
-        [UNetModel('densenet169', probabilistic=True) for _ in range(3)]
+        [UNetModel('densenet169', out_channels=2) for _ in range(3)]
     )
     assert wrapper(ex_inp).expected_variance().shape == (8, 1, 240, 320)
     print("Passed")

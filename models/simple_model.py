@@ -74,7 +74,7 @@ def test_simple_model():
     ex_out = s_model(ex_inp)
     assert ex_out[0].shape == (32, 8)
 
-    from distributions.dist_wrappers import ProbabilisticWrapper
+    from distributions.distribution_wrappers import ProbabilisticWrapper
     from distributions.nw_prior import NormalWishartPrior
 
     wrapper = ProbabilisticWrapper(NormalWishartPrior, s_model)

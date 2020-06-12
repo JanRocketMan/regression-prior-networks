@@ -25,6 +25,14 @@ class NormalWishartPrior(NormalDiagonalWishart):
             ).pow(0.5),
         )
 
+    @property
+    def mean(self):
+        """Returns predictive posterior mean"""
+        ppe_mean = self.forward().mean
+        if ppe_mean.size(-1) == 1:
+            return ppe_mean[..., 0]
+        return ppe_mean
+
     def predictive_posterior_log_prob(self, value):
         return self.forward().log_prob(value)
 

@@ -18,6 +18,10 @@ class GaussianDiagonalMixture(Distribution):
                 Normal(means[i], scales[i], validate_args=True)
             )
 
+    @property
+    def mean(self):
+        return self.expected_mean()
+
     def expected_mean(self):
         return sum(
             [dist.mean for dist in self.distributions]

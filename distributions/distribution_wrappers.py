@@ -32,6 +32,8 @@ class ProbabilisticWrapper(Module):
         predicted_params = transform_to_distribution_params(
             out_params, self.distr_dim
         )
+        if not self.training:
+            predicted_params = [param.cpu() for param in predicted_params]
         return self.distribution_cls(*predicted_params)
 
 
@@ -40,6 +42,7 @@ class GaussianEnsembleWrapper(Module):
     def __init__(self, models):
         super(GaussianEnsembleWrapper, self).__init__()
         self.models = models
+        self.distribution_cls = GaussianDiagonalMixture
 
     def forward(self, x):
         agg = []
@@ -49,7 +52,12 @@ class GaussianEnsembleWrapper(Module):
         all_predicted_params = [
             transform_to_distribution_params(p) for p in agg
         ]
-        return GaussianDiagonalMixture(
+        if not self.training:
+            all_predicted_params = [
+                [p.cpu() for p in internal_params]
+                for internal_params in all_predicted_params
+            ]
+        return self.distribution_cls(
             torch.cat(
                 [params[0].unsqueeze(0) for params in all_predicted_params]
             ),
@@ -64,11 +72,16 @@ class GaussianEnsembleWrapper(Module):
             model.load_state_dict(list_of_state_dicts[i])
 
     def eval(self):
+        super(GaussianEnsembleWrapper, self).eval()
         for model in self.models:
             model.eval()
+        return self
 
     def cuda(self):
         return self.to('cuda')
+
+    def cpu(self):
+        return self.to('cpu')
 
     def to(self, device):
         for model in self.models:
