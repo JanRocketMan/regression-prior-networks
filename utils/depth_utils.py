@@ -88,13 +88,17 @@ def renorm_distribution(
             dist.distributions[i] = renorm_distribution(
                 dist.distributions[i], maxDepth, minDepth, transform_type
             )
+    elif hasattr(dist, 'precision_diag'):
+        dist.loc = renorm_param(
+            dist.loc, maxDepth, minDepth, transform_type, True
+        )
+        dist.precision_diag = dist.precision_diag * (maxDepth / minDepth) ** 2
     else:
         dist.loc = renorm_param(
             dist.loc, maxDepth, minDepth, transform_type, True
         )
-
         dist.scale = renorm_param(
-            dist.scale, maxDepth, minDepth, transform_type, True
+            dist.scale, maxDepth, minDepth, transform_type, False
         )
 
     return dist
@@ -122,9 +126,7 @@ def predict_targets(
             torch.FloatTensor(images).permute(0, 3, 1, 2).to(device)
         ).cpu().permute(0, 2, 3, 1)
     # Put in expected range
-    return np.clip(
-        InvertDepthNorm(
-            predictions, maxDepth=maxDepth, minDepth=minDepth,
-            transform_type=transform_type
-        ), minDepth, maxDepth
-    ) / maxDepth
+    return renorm_param(
+        predictions, maxDepth=maxDepth, minDepth=minDepth,
+        transform_type=transform_type, clip=True
+    )

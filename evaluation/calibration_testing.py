@@ -8,13 +8,13 @@ from torch.distributions.normal import Normal
 from distributions import GaussianDiagonalMixture, NormalWishartPrior
 from utils.nyuv2_loading import load_test_data
 from utils.model_utils import load_unet_model_from_checkpoint
-from utils.depth_utils import renorm_distribution
+from utils.depth_utils import renorm_distribution, DepthNorm, InvertDepthNorm
 
 
-def evaluate_distributions(
-    model, inputs, device='cuda:0'
+def get_distributions(
+    model, inputs, device='cuda:0', distribution_renorm=None
 ):
-    """Returns list of predicted distributions"""
+    """Returns list of predicted distributions for a given inputs"""
     dists_list = []
 
     for i in range(len(inputs)):
@@ -22,23 +22,19 @@ def evaluate_distributions(
             # Compute results
             pred_dist = model(inputs[i].unsqueeze(0).to(device))
 
+            # Renormalize distribution parameters (if required)
+            if distribution_renorm:
+                pred_dist = distribution_renorm(pred_dist)
+
             if isinstance(pred_dist, NormalWishartPrior):
                 # Infer posterior t-distribution from a prior prediction
                 pred_dist = pred_dist.forward()
-                pred_dist = renorm_distribution(pred_dist)
-                pred_dist = Normal(
-                    pred_dist.mean,
-                    pred_dist.variance.pow(0.5)
-                )
             elif isinstance(pred_dist, GaussianDiagonalMixture):
                 # Approximate ensemble with a single Gaussian
-                pred_dist = renorm_distribution(pred_dist)
                 pred_dist = Normal(
                     pred_dist.expected_mean(),
                     pred_dist.total_variance().pow(0.5)
                 )
-            else:
-                pred_dist = renorm_distribution(pred_dist)
 
         dists_list.append(pred_dist)
 
@@ -91,14 +87,15 @@ def get_calibration_metrics(args):
     print("Calculating NLLs...\n")
 
     rgb = torch.FloatTensor(rgb / 255).permute(0, 3, 1, 2)
-    targets = torch.FloatTensor(depth) / 10.0
 
-    dists = evaluate_distributions(
-        model, rgb, device=args.device
-    )
-
+    targets = torch.FloatTensor(depth)
+    targets = DepthNorm(targets, transform_type='scaled')
     targets = torch.nn.functional.interpolate(
         targets.unsqueeze(1), scale_factor=0.5
+    )
+
+    dists = get_distributions(
+        model, rgb, device=args.device, distribution_renorm=renorm_distribution
     )
 
     image_nlls = [
