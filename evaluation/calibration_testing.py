@@ -6,96 +6,57 @@ import torch
 from torch.distributions.normal import Normal
 
 from distributions import GaussianDiagonalMixture, NormalWishartPrior
-from utils.nyuv2_loading import load_test_data
-from utils.model_utils import load_unet_model_from_checkpoint
-from utils.depth_utils import renorm_distribution, DepthNorm, InvertDepthNorm
-
-
-def get_distributions(
-    model, inputs, device='cuda:0', distribution_renorm=None
-):
-    """Returns list of predicted distributions for a given inputs"""
-    dists_list = []
-
-    for i in range(len(inputs)):
-        with torch.no_grad():
-            # Compute results
-            pred_dist = model(inputs[i].unsqueeze(0).to(device))
-
-            # Renormalize distribution parameters (if required)
-            if distribution_renorm:
-                pred_dist = distribution_renorm(pred_dist)
-
-            if isinstance(pred_dist, NormalWishartPrior):
-                # Infer posterior t-distribution from a prior prediction
-                pred_dist = pred_dist.forward()
-            elif isinstance(pred_dist, GaussianDiagonalMixture):
-                # Approximate ensemble with a single Gaussian
-                pred_dist = Normal(
-                    pred_dist.expected_mean(),
-                    pred_dist.total_variance().pow(0.5)
-                )
-
-        dists_list.append(pred_dist)
-
-    return dists_list
-
-
-def calculate_diff_auc(pred, step=0.05):
-    """Calculates area to diagonal (ideal calibration). Lower - better"""
-    return np.sum(
-        np.abs(
-            np.array(pred) - np.arange(0.0, 1.0 + step, step)
-        ) * step
-    )
+from utils.depth_utils import DepthNorm, predict_distributions
 
 
 def calculate_calibration_intervals(
-    targets, est_dist_params, step=0.05, quantile_distribution='Normal'
+    targets, predicted_means, predicted_stddevs,
+    step=0.05, verbose=False
 ):
-    diff_y = np.abs(targets - est_dist_params['mean'])
+    """
+    Computes calibration curve - how theoretical
+    conf intervals correlate wti practical (assuming prediction is Normal)
+    """
+    real_errors = np.abs(targets - predicted_means)
 
-    if quantile_distribution == 'Normal':
-        mean, std = est_dist_params['mean'], est_dist_params['scale']
-        th_delta_fn = lambda q: -mean + norm.interval(q, mean, std)[1]
-    else:
-        df, loc = est_dist_params['df'], est_dist_params['mean']
-        scale = est_dist_params['scale']
-        th_delta_fn = lambda q: -loc + t.interval(q, df, loc=loc, scale=scale)[1]
     all_fractions = []
 
-    for q in tqdm(np.arange(0.0, 1.0 + step, step)):
-        deltas = th_delta_fn(q)
+    q_list = np.arange(0.0, 1.0 + step, step)
+    if verbose:
+        q_list = tqdm(q_list)
+
+    for q in q_list:
+        predicted_error_bound = -predicted_means + \
+            norm.interval(q, predicted_means, predicted_stddevs)[1]
+
         emp_fraction = np.mean((
-            diff_y <= deltas
+            real_errors <= predicted_error_bound
         ).astype(float))
         all_fractions.append(emp_fraction)
-    return all_fractions
+
+    # Calculates area to diagonal (ideal calibration).
+    c_auc_score = np.abs(
+        np.array(all_fractions) - np.arange(0.0, 1.0 + step, step)
+    ).sum() * step
+
+    return all_fractions, c_auc_score
 
 
-def get_calibration_metrics(args):
-    print('Loading trained model...')
-    model = load_unet_model_from_checkpoint(
-        args.checkpoint, args.model_type, args.backbone, args.device
-    )
-    print("Trained model loaded.\n")
+def nyu_evaluate_calibration_metrics(
+    model, rgb, depth, args
+):
+    inputs = torch.FloatTensor(rgb / 255).permute(0, 3, 1, 2)
 
-    print('Loading test data...', end='')
-    rgb, depth, _ = load_test_data(args.zip_folder)
-    print('Test data loaded.\n')
-
-    print("Calculating NLLs...\n")
-
-    rgb = torch.FloatTensor(rgb / 255).permute(0, 3, 1, 2)
-
+    # Rescale & downsample targets
     targets = torch.FloatTensor(depth)
-    targets = DepthNorm(targets, transform_type='scaled')
+    targets = DepthNorm(targets, transform_type=args.targets_transform)
     targets = torch.nn.functional.interpolate(
         targets.unsqueeze(1), scale_factor=0.5
     )
 
-    dists = get_distributions(
-        model, rgb, device=args.device, distribution_renorm=renorm_distribution
+    dists = predict_distributions(
+        model, inputs, transform_type=args.targets_transform,
+        device=args.device
     )
 
     image_nlls = [
@@ -105,36 +66,17 @@ def get_calibration_metrics(args):
     ]
 
     mean_nll, std_nll = np.mean(image_nlls), np.std(image_nlls)
-    print('NLL: %.4f +- %.4f' % (mean_nll, std_nll))
 
-    print("Estimating C-AUC...")
+    if args.verbose:
+        print('NLL: %.4f +- %.4f' % (mean_nll, std_nll))
 
-    if isinstance(dists[0], Normal):
-        est_dist_params = {
-            'mean': np.concatenate(
-                [dist.mean.reshape(-1) for dist in dists]
-            ),
-            'scale': np.concatenate(
-                [dist.stddev.reshape(-1) for dist in dists]
-            )
-        }
-    else:
-        est_dist_params = {
-            'mean': np.concatenate(
-                [dist.loc.reshape(-1) for dist in dists]
-            ),
-            'df': np.concatenate(
-                [dist.df.reshape(-1) for dist in dists]
-            ),
-            'scale': np.concatenate(
-                [dist.variance.pow(0.5).reshape(-1) for dist in dists]
-            )
-        }
+        print("Estimating C-AUC...")
 
-    calibr_curve = calculate_calibration_intervals(
-        targets.reshape(-1).numpy(), est_dist_params
+    calibr_curve, c_auc_score = calculate_calibration_intervals(
+        targets.reshape(-1).numpy(),
+        np.concatenate([dist.mean.reshape(-1) for dist in dists]),
+        np.concatenate([dist.variance.reshape(-1) ** 0.5 for dist in dists]),
+        verbose=args.verbose
     )
 
-    print("C-AUC score: %.3f" % calculate_diff_auc(calibr_curve))
-
-    return image_nlls, calibr_curve
+    return mean_nll, c_auc_score, image_nlls, calibr_curve

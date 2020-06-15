@@ -7,6 +7,8 @@ import re
 
 from skimage.transform import resize
 
+from distributions import GaussianDiagonalMixture, NormalWishartPrior
+
 
 def _load_densenet_dict(model, load_path):
     """
@@ -29,6 +31,17 @@ def _load_densenet_dict(model, load_path):
             state_dict[new_key] = state_dict[key]
             del state_dict[key]
     model.load_state_dict(state_dict)
+
+
+def reshape_images(images):
+    # Support multiple RGBs, one RGB image, even grayscale
+    if len(images.shape) < 3:
+        images = np.stack((images, images, images), axis=2)
+    if len(images.shape) < 4:
+        images = images.reshape(
+            (1, images.shape[0], images.shape[1], images.shape[2])
+        )
+    return images
 
 
 def scale_up(scale, images):
@@ -82,40 +95,27 @@ def renorm_param(
 def renorm_distribution(
     dist, maxDepth=1000.0, minDepth=10, transform_type='scaled'
 ):
-    """Renormalizes distribution parameters back to targets space"""
-    if hasattr(dist, 'distributions'):
-        for i in range(len(dist.distributions)):
-            dist.distributions[i] = renorm_distribution(
-                dist.distributions[i], maxDepth, minDepth, transform_type
-            )
-    elif hasattr(dist, 'precision_diag'):
-        dist.loc = renorm_param(
-            dist.loc, maxDepth, minDepth, transform_type, True
-        )
-        dist.precision_diag = dist.precision_diag * (maxDepth / minDepth) ** 2
-    else:
-        dist.loc = renorm_param(
-            dist.loc, maxDepth, minDepth, transform_type, True
-        )
-        dist.scale = renorm_param(
-            dist.scale, maxDepth, minDepth, transform_type, False
-        )
+    """Renormalizes distribution parameters back to targets space."""
+    if transform_type != 'scaled':
+        raise Exception("Only scaling transformations are supported")
+    dist.loc = renorm_param(
+        dist.loc, maxDepth, minDepth, transform_type, True
+    )
+
+    dist.scale = renorm_param(
+        dist.scale, maxDepth, minDepth, transform_type, False
+    )
 
     return dist
 
 
 def predict_targets(
     model, images, minDepth=10, maxDepth=1000,
-    batch_size=2, transform_type='inverse', device='cuda:0'
+    transform_type='scaled', device='cuda:0'
 ):
     """Use trained model to predict depths"""
-    # Support multiple RGBs, one RGB image, even grayscale
-    if len(images.shape) < 3:
-        images = np.stack((images, images, images), axis=2)
-    if len(images.shape) < 4:
-        images = images.reshape(
-            (1, images.shape[0], images.shape[1], images.shape[2])
-        )
+    images = reshape_images(images)
+
     # Compute predictions
     if hasattr(model, 'distribution_cls'):
         predictions = model(
@@ -130,3 +130,34 @@ def predict_targets(
         predictions, maxDepth=maxDepth, minDepth=minDepth,
         transform_type=transform_type, clip=True
     )
+
+
+def predict_distributions(
+    model, images, minDepth=10, maxDepth=1000,
+    transform_type='scaled', device='cuda:0', renorm=True
+):
+    """Returns list of predicted distributions for a given inputs"""
+    dists_list = []
+
+    for idx in range(len(images)):
+        with torch.no_grad():
+            # Compute results
+            pred_dist = model(images[idx].to(device).unsqueeze(0))
+
+            if isinstance(pred_dist, NormalWishartPrior):
+                # Infer posterior t-distribution from a prior prediction
+                pred_dist = pred_dist.forward()
+            elif isinstance(pred_dist, GaussianDiagonalMixture):
+                # Approximate ensemble with a single Gaussian
+                pred_dist = Normal(
+                    pred_dist.expected_mean(),
+                    pred_dist.total_variance().pow(0.5)
+                )
+
+        # Renormalize distribution parameters (if required)
+        if renorm:
+            pred_dist = renorm_distribution(pred_dist)
+
+        dists_list.append(pred_dist)
+
+    return dists_list

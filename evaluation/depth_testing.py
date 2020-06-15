@@ -24,10 +24,14 @@ def compute_rel_metrics(gt, pred):
     return a1, a2, a3, abs_rel, rmse, log_10
 
 
-def evaluate_model(
+def nyu_evaluate_performance_metrics(
     model, rgb, depth, crop,
-    batch_size=6, verbose=False, transform_type='inverse', device='cuda:0'
+    batch_size=6, verbose=False, transform_type='scaled', device='cuda:0'
 ):
+    """
+    Evaluates common performance metrics (\\delta_1, \\delta_2, etc)
+    of MDE trained model on Nyu v2
+    """
     N = len(rgb)
     bs = batch_size
 
@@ -41,7 +45,7 @@ def evaluate_model(
             pred_y = scale_up(
                 2, predict_targets(
                     model, x/255, minDepth=10, maxDepth=1000,
-                    batch_size=bs, transform_type=transform_type,
+                    transform_type=transform_type,
                     device=device
                 )[:, :, :, 0]
             ) * 10.0
@@ -49,7 +53,7 @@ def evaluate_model(
             pred_y_flip = scale_up(
                 2, predict_targets(
                     model, x[..., ::-1, :]/255, minDepth=10, maxDepth=1000,
-                    batch_size=bs, transform_type=transform_type,
+                    transform_type=transform_type,
                     device=device
                 )[:, :, :, 0]
             ) * 10.0
@@ -70,52 +74,4 @@ def evaluate_model(
                 depth_scores[k][(i*bs)+j] = errors[k]
 
     e = depth_scores.mean(axis=1)
-    if verbose:
-        print(
-            "{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format(
-                'a1', 'a2', 'a3', 'rel', 'rms', 'log_10'
-            )
-        )
-        print(
-            "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}".format(
-                e[0], e[1], e[2], e[3], e[4], e[5]
-            )
-        )
     return e
-
-
-def get_test_metrics(args):
-    print('Loading trained model...')
-    model = load_unet_model_from_checkpoint(
-        args.checkpoint, args.model_type, args.backbone, args.device
-    )
-    print("Trained model loaded.\n")
-
-    print('Loading test data...', end='')
-    rgb, depth, crop = load_test_data(args.zip_folder)
-    print('Test data loaded.\n')
-
-    start = time.time()
-    print('Testing...')
-
-    # Evaluate model by various metrics
-    e = evaluate_model(
-        model, rgb, depth, crop,
-        batch_size=args.bs,
-        transform_type=args.targets_transform,
-        device=args.device
-    )
-
-    print(
-        "{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format(
-            'a1', 'a2', 'a3', 'rel', 'rms', 'log_10'
-        )
-    )
-    print(
-        "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}".format(
-            e[0], e[1], e[2], e[3], e[4], e[5]
-        )
-    )
-
-    end = time.time()
-    print('\nFinished testing in', end - start, 'seconds')

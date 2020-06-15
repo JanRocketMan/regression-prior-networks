@@ -27,7 +27,7 @@ def load_test_data(zip_path):
     rgb = np.load(BytesIO(data['eigen_test_rgb.npy']))
     depth = np.load(BytesIO(data['eigen_test_depth.npy']))
     crop = np.load(BytesIO(data['eigen_test_crop.npy']))
-    print("Loaded Test data", np.min(depth), np.max(depth))
+    # print("Loaded Test data", np.min(depth), np.max(depth))
     return rgb, depth, crop
 
 

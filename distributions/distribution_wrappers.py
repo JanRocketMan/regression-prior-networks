@@ -15,7 +15,7 @@ def transform_to_distribution_params(params, distr_dim=1, eps=1e-6):
         return [mean, std]
     elif len(params) == 3:
         beta = Softplus()(params[2]) + eps
-        kappa, nu = beta, beta + params[0].size(distr_dim) + 1
+        kappa, nu = beta, beta + params[0].size(distr_dim) + 2  # !!!
         return [mean.unsqueeze(-1), std.unsqueeze(-1), kappa, nu]
 
 
