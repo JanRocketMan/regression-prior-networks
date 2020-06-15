@@ -1,9 +1,22 @@
-# regression-prior-networks
+# Regression Prior Networks
 An official PyTorch implementation of "Regression Prior Networks" for effective uncertainty estimation.
 
+# Steps to reproducing scores
 
-Important! Whenever evaluatiing ensemble of Gaussian models, use the following:
+Download data from DenseDepth repository:
+
+https://tinyurl.com/nyu-data-zip
+
+store all zip in "data" folder.
+
+Download model checkpoints from:
+
+https://drive.google.com/drive/folders/1jL-g3yALvhilkNFlP6_ahtb7PY6XqxIW?usp=sharing
+
+store them in "checkpoints" folder.
+
+Run
 
 ```bash
-python eval_nyu_model.py --checkpoint $(printf "./checkpoints/dense_depth_gaussian/%d/19.ckpt " {1..5})  --model_type "gaussian-ensemble" --targets_transform "scaled"
+bash experiments/reproduce_nyu_metrics.sh
 ```
