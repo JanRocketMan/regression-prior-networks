@@ -65,9 +65,11 @@ def nyu_evaluate_performance_metrics(
 
         # Compute errors per image in batch
         for j in range(len(true_y)):
+            j_pred = (0.5 * pred_y[j]) + (0.5 * np.fliplr(pred_y_flip[j]))
+
             errors = compute_rel_metrics(
                 true_y[j],
-                (0.5 * pred_y[j]) + (0.5 * np.fliplr(pred_y_flip[j]))
+                j_pred
             )
 
             for k in range(len(errors)):

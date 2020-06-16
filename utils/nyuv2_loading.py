@@ -7,6 +7,7 @@ from PIL import Image
 from zipfile import ZipFile
 from io import BytesIO
 import random
+import glob
 
 
 def _is_pil_image(img):
@@ -27,7 +28,6 @@ def load_test_data(zip_path):
     rgb = np.load(BytesIO(data['eigen_test_rgb.npy']))
     depth = np.load(BytesIO(data['eigen_test_depth.npy']))
     crop = np.load(BytesIO(data['eigen_test_crop.npy']))
-    # print("Loaded Test data", np.min(depth), np.max(depth))
     return rgb, depth, crop
 
 

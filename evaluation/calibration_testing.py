@@ -45,6 +45,7 @@ def calculate_calibration_intervals(
 def nyu_evaluate_calibration_metrics(
     model, rgb, depth, args
 ):
+    """Evaluates quality of errors detection via NLL and C-AUC scores"""
     inputs = torch.FloatTensor(rgb / 255).permute(0, 3, 1, 2)
 
     # Rescale & downsample targets

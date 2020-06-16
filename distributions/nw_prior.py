@@ -44,9 +44,6 @@ class NormalWishartPrior(NormalDiagonalWishart):
             )
         return variance_res[..., 0]
 
-    def log_predictive_posterior_variance(self):
-        return self.predictive_posterior_variance().log()
-
     def predictive_posterior_entropy(self):
         entropy_res = self.forward().entropy()
         if entropy_res.size(-1) != 1:
@@ -98,9 +95,6 @@ class NormalWishartPrior(NormalDiagonalWishart):
     def variance_of_expected(self):
         return self.expected_variance() / self.belief
 
-    def log_variance_of_expected(self):
-        return self.variance_of_expected().log()
-
     def expected_variance(self):
         result = 1 / (
             self.precision_diag * (
@@ -115,9 +109,6 @@ class NormalWishartPrior(NormalDiagonalWishart):
 
         return result[..., 0]
 
-    def log_expected_variance(self):
-        return self.expected_variance().log()
-
     def total_variance(self):
         tv = self.variance_of_expected() + self.expected_variance()
         ppv = self.predictive_posterior_variance()
@@ -125,9 +116,6 @@ class NormalWishartPrior(NormalDiagonalWishart):
         rel_diff = (tv - ppv).abs() / tv.abs().pow(0.5) / ppv.abs().pow(0.5)
         assert (rel_diff < 1e-6).all()
         return tv
-
-    def log_total_variance(self):
-        return self.total_variance().log()
 
 
 def test_nw_prior():

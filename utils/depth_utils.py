@@ -98,13 +98,24 @@ def renorm_distribution(
     """Renormalizes distribution parameters back to targets space."""
     if transform_type != 'scaled':
         raise Exception("Only scaling transformations are supported")
-    dist.loc = renorm_param(
-        dist.loc, maxDepth, minDepth, transform_type, True
-    )
 
-    dist.scale = renorm_param(
-        dist.scale, maxDepth, minDepth, transform_type, False
-    )
+    if isinstance(dist, GaussianDiagonalMixture):
+        for i in range(len(dist.distributions)):
+            dist.distributions[i] = renorm_distribution(
+                dist.distributions[i], maxDepth=maxDepth, minDepth=minDepth,
+                transform_type=transform_type
+            )
+    else:
+        dist.loc = renorm_param(
+            dist.loc, maxDepth, minDepth, transform_type, True
+        )
+
+        if isinstance(dist, NormalWishartPrior):
+            dist.precision_diag = dist.precision_diag * (maxDepth / minDepth) ** 2
+        else:
+            dist.scale = renorm_param(
+                dist.scale, maxDepth, minDepth, transform_type, False
+            )
 
     return dist
 
@@ -134,7 +145,7 @@ def predict_targets(
 
 def predict_distributions(
     model, images, minDepth=10, maxDepth=1000,
-    transform_type='scaled', device='cuda:0', renorm=True
+    transform_type='scaled', device='cuda:0', renorm=True, posterior=True
 ):
     """Returns list of predicted distributions for a given inputs"""
     dists_list = []
@@ -144,10 +155,10 @@ def predict_distributions(
             # Compute results
             pred_dist = model(images[idx].to(device).unsqueeze(0))
 
-            if isinstance(pred_dist, NormalWishartPrior):
+            if posterior and isinstance(pred_dist, NormalWishartPrior):
                 # Infer posterior t-distribution from a prior prediction
                 pred_dist = pred_dist.forward()
-            elif isinstance(pred_dist, GaussianDiagonalMixture):
+            elif posterior and isinstance(pred_dist, GaussianDiagonalMixture):
                 # Approximate ensemble with a single Gaussian
                 pred_dist = Normal(
                     pred_dist.expected_mean(),
@@ -161,3 +172,12 @@ def predict_distributions(
         dists_list.append(pred_dist)
 
     return dists_list
+
+
+def get_uncertainty_measure(dist, unc_name):
+    unc_measure = getattr(dist, unc_name)
+    if hasattr(unc_measure, '__call__'):
+        unc_measure = unc_measure().squeeze()
+    else:
+        unc_measure = unc_measure.squeeze()
+    return unc_measure

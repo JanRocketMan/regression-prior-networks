@@ -53,22 +53,13 @@ class GaussianDiagonalMixture(Distribution):
             ]
         ) / len(self.distributions)
 
-    def log_variance_of_expected(self):
-        return self.variance_of_expected().log()
-
     def expected_variance(self):
         return sum(
             [dist.variance for dist in self.distributions]
         ) / len(self.distributions)
 
-    def log_expected_variance(self):
-        return self.expected_variance().log()
-
     def total_variance(self):
         return self.variance_of_expected() + self.expected_variance()
-
-    def log_total_variance(self):
-        return self.total_variance().log()
 
     def estimated_total_entropy(self):
         return self.expected_entropy() + self.expected_pairwise_kl()
