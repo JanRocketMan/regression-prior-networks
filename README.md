@@ -8,9 +8,6 @@ Example
 Performance metrics
 ![result2](plots/performance-metrics.png)
 
-Calibration of predicted deviations vs ground truth errors
-<img src="plots/mean-calibration.png" alt="drawing" width="400"/>
-
 # Installation
 This repo was tested on Python 3.7.6 and PyTorch 1.4.0
 
