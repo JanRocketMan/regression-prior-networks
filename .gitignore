@@ -137,6 +137,7 @@ data/*
 # Logs and checkpoints
 logs/*
 checkpoints/*
+plots/tmp.png
 
 # VS code settings
 .vscode/*

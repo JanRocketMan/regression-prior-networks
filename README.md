@@ -2,7 +2,7 @@
 An official PyTorch implementation of "Regression Prior Networks" for effective uncertainty estimation.
 
 # Examples
-![result](plots/nyu_result.png)
+![result](plots/example_nyu_630.png)
 
 # Reproducing
 

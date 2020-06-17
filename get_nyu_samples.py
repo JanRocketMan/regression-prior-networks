@@ -1,11 +1,18 @@
 from argparse import ArgumentParser
 
+import numpy as np
+import seaborn as sns
+from PIL import Image
+import matplotlib.pyplot as plt
+
 import torch
-import torchvision.utils as vutils
+from torchvision.transforms import ToTensor, Resize, ToPILImage
 
 from evaluation.show_examples import show_model_examples
 from utils.nyuv2_loading import load_test_data
+from evaluation.ood_testing import load_ood_data
 from utils.model_utils import load_unet_model_from_checkpoint
+from utils.viz_utils import get_example_figure, get_tensor_with_histograms
 
 
 if __name__ == '__main__':
@@ -13,11 +20,21 @@ if __name__ == '__main__':
         description='Evaluation of trained \
             Monocular Depth Estimation model on Nyu Depth v2'
     )
-    parser.add_argument('--zip_folder', default='data')
+    parser.add_argument('--data_path', default='data')
     parser.add_argument(
-        '--checkpoint',
-        default=['checkpoints/dense_depth_gaussian/1/19.ckpt'],
+        '--data_type', default='nyu', choices=['nyu', 'kitti', 'lsun']
+    )
+    parser.add_argument(
+        '--gaussian_checkpoints',
+        default=[
+            'checkpoints/dense_depth_gaussian/' + str(i + 1) + '/19.ckpt'
+            for i in range(5)
+        ],
         nargs='+'
+    )
+    parser.add_argument(
+        '--endd_checkpoint',
+        default='checkpoints/dense_depth_endd/1/21.ckpt'
     )
     parser.add_argument(
         '--indices',
@@ -42,50 +59,55 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cuda:0')
     args = parser.parse_args()
 
-    rgb, depth, crop = load_test_data(args.zip_folder)
+    all_indices = [int(idx) for idx in args.indices]
+    if args.data_type == 'nyu':
+        rgb, depth, crop = load_test_data(args.data_path)
+    else:
+        rgb = load_ood_data(args.data_path, args.data_type)
+        depth, crop = None, None
 
     max_limits = None
     all_results = {}
     checkpoints = {
-        'gaussian': ['checkpoints/dense_depth_gaussian/1/19.ckpt'],
-        'gaussian-ensemble': [
-            'checkpoints/dense_depth_gaussian/1/19.ckpt', 
-            'checkpoints/dense_depth_gaussian/2/19.ckpt', 
-            'checkpoints/dense_depth_gaussian/3/19.ckpt',
-            'checkpoints/dense_depth_gaussian/4/19.ckpt',
-            'checkpoints/dense_depth_gaussian/5/19.ckpt'
-        ],
-        'nw_prior': ['checkpoints/dense_depth_endd/1/21.ckpt']
+        'gaussian': [args.gaussian_checkpoints[2]],
+        'gaussian-ensemble': args.gaussian_checkpoints,
+        'nw_prior': [args.endd_checkpoint]
     }
     for model_type in args.models:
-        print(model_type)
         model = load_unet_model_from_checkpoint(
             checkpoints[model_type], model_type, args.backbone, args.device
         )
         if model_type == 'gaussian':
             results = show_model_examples(
-                model, rgb, depth, [int(idx) for idx in args.indices],
+                model, rgb, depth, all_indices,
                 ['variance'], args.targets_transform, args.device
             )
             max_limits = results[-1]
         else:
             results = show_model_examples(
-                model, rgb, depth, [int(idx) for idx in args.indices],
+                model, rgb, depth, all_indices,
                 args.measures, args.targets_transform, args.device, max_limits
             )
             all_results[model_type] = results
 
-    output_res = torch.zeros(len(args.indices) * 8, 3, 240, 320)
-    output_res[0::8] = all_results["gaussian-ensemble"][0]
-    output_res[1::8] = all_results["gaussian-ensemble"][3]
-    output_res[2::8] = all_results["gaussian-ensemble"][4]['total_variance']
-    output_res[3::8] = all_results["gaussian-ensemble"][4]['expected_pairwise_kl']
-
-    output_res[4::8] = all_results["nw_prior"][0]
-    output_res[5::8] = all_results["nw_prior"][3]
-    output_res[6::8] = all_results["nw_prior"][4]['total_variance']
-    output_res[7::8] = all_results["nw_prior"][4]['expected_pairwise_kl']
-
-    vutils.save_image(
-        output_res, "plots/nyu_result.png", nrow=4, pad_value=255
+    model_names = ['gaussian', 'gaussian-ensemble', 'nw_prior']
+    plot_names = ['Single', 'ENSM', 'EnD$^2$']
+    all_hists = get_tensor_with_histograms(
+        all_results, plot_names, model_names
     )
+
+    for i, idx in enumerate(args.indices):
+        ensm_data, endd_data = [[
+            all_results[model_n][0][i],
+            all_results[model_n][2][i],
+            all_results[model_n][3]['total_variance'][i],
+            all_results[model_n][3]['expected_pairwise_kl'][i]
+        ] for model_n in ['gaussian-ensemble', 'nw_prior']]
+        figure = get_example_figure(
+            ensm_data, endd_data, all_hists[i*4:i*4+4]
+        )
+        figure.savefig(
+            'plots/example_' + args.data_type + '_' + str(idx) + '.png',
+            dpi=300, bbox_inches='tight'
+        )
+        plt.clf()
