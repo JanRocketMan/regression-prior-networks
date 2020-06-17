@@ -9,7 +9,7 @@ Performance metrics
 ![result2](plots/performance-metrics.png)
 
 Calibration of predicted deviations vs ground truth errors
-![result3](plots/mean-calibration.png)
+![result3](plots/mean-calibration.png | width=100)
 
 # Installation
 This repo was tested on Python 3.7.6 and PyTorch 1.4.0
