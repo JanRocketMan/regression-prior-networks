@@ -39,6 +39,21 @@ To reproduce reported test metrics (table 3), run
 bash experiments/reproduce_nyu_metrics.sh
 ```
 
+OOD scores (table 4) may be reproduced with
+
+```bash
+bash experiments/reproduce_ood_scores.sh
+```
+
+Please note that we require additional [KITTI subset](https://drive.google.com/file/d/1kOLGi498371eLHJlu_NWe9o3NQ49kJUU/view?usp=sharing) (437 MB) for this. Unzip it in data folder.
+(You may simply take first 654 images from test_depth_completion_anonymous if you have KITTI dataset)
+
+Finally, to get individual examples use:
+
+```bash
+python get_nyu_samples.py --indices $DESIRED_INDICES
+```
+
 # ToDo
 
 - [x] Advanced visualization of results
