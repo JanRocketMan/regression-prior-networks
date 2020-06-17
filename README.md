@@ -5,7 +5,7 @@ An official PyTorch implementation of "Regression Prior Networks" for effective 
 Example
 ![result1](plots/example_nyu_630.png)
 
-Performance metrics
+Performance metrics (monocular depth estimation)
 ![result2](plots/performance-metrics.png)
 
 # Installation
