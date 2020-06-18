@@ -64,6 +64,7 @@ def nyu_evaluate_ood_auc_scores(
 
         joint_scores = np.concatenate((nyu_stats, ood_stats), axis=0)
         true_labels = np.concatenate((np.zeros(654), np.ones(654)), axis=0)
+        joint_scores = np.nan_to_num(joint_scores)
 
         measure_auc_dict[measure] = roc_auc_score(true_labels, joint_scores)
 

@@ -1,4 +1,4 @@
-printf "Single model 1:\n"
+printf "Single model:\n"
 python eval_nyu_model.py --checkpoint "checkpoints/dense_depth_gaussian/3/19.ckpt"  --model_type "gaussian" --targets_transform "scaled"
 
 printf "ENSM model:\n"
