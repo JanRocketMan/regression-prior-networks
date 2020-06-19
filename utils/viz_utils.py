@@ -65,7 +65,7 @@ def get_tensor_with_histograms(results_dict, plot_names, model_names):
             plt.figure(figsize=(13.33, 10))
             plt.rc('font', size=50)
 
-            max_p = 95 if 'variance' in key else 99
+            max_p = 95 if key == 'expected_pairwise_kl' else 100
             c_max = np.percentile(
                 np.concatenate([
                     results_dict[m_name][1][key][ind]

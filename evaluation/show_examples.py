@@ -53,7 +53,9 @@ def show_model_examples(
         measure_maps[measure] = all_measures
         # Transform all variances to standard deviations
         if 'variance' in measure:
-            measure_maps[measure] = [m.pow(0.5) for m in all_measures]
+            measure_maps[measure] = [
+                np.sqrt(2) * m.pow(0.5) for m in all_measures
+            ]
 
     # Save difference & unc measures stats to plot histograms
     all_hists = {}
@@ -73,7 +75,11 @@ def show_model_examples(
 
     plot_diffs = torch.from_numpy(np.array([
         turbo_cm(
-            standartize_array(diffs[i].squeeze(), 0.0, max_limits[i])
+            standartize_array(
+                diffs[i].squeeze(),
+                np.percentile(diffs[i], 0),
+                max_limits[i]
+            )
         )[..., :3]
         for i in range(len(diffs))
     ])).permute(0, 3, 1, 2)
@@ -84,7 +90,8 @@ def show_model_examples(
             normalized_measures = [
                 standartize_array(
                     measure_maps[measure][i].squeeze(),
-                    0.0, max_limits[i]
+                    np.percentile(measure_maps[measure][i], 0),
+                    max_limits[i]
                 )
                 for i in range(len(diffs))
             ]
@@ -92,7 +99,8 @@ def show_model_examples(
             normalized_measures = [
                 standartize_array(
                     measure_maps[measure][i].squeeze(),
-                    0.0, np.percentile(measure_maps[measure][i], 99)
+                    np.percentile(measure_maps[measure][i], 0),
+                    np.percentile(measure_maps[measure][i], 99)
                 )
                 for i in range(len(diffs))
             ]

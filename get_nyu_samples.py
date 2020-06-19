@@ -86,8 +86,11 @@ if __name__ == '__main__':
         else:
             results = show_model_examples(
                 model, rgb, depth, all_indices,
-                args.measures, args.targets_transform, args.device, max_limits
+                args.measures, args.targets_transform, args.device,
+                (None if 'gaussian' in model_type else max_limits)
             )
+            if 'gaussian' in model_type:
+                max_limits = results[-1]
             all_results[model_type] = results
 
     model_names = ['gaussian', 'gaussian-ensemble', 'nw_prior']
@@ -99,15 +102,16 @@ if __name__ == '__main__':
     for i, idx in enumerate(args.indices):
         ensm_data, endd_data = [[
             all_results[model_n][0][i],
-            all_results[model_n][2][i],
-            all_results[model_n][3]['total_variance'][i],
-            all_results[model_n][3]['expected_pairwise_kl'][i]
+            all_results[model_n][2][i]
+        ] + [
+            all_results[model_n][3][measure][i]
+            for measure in args.measures
         ] for model_n in ['gaussian-ensemble', 'nw_prior']]
         figure = get_example_figure(
             ensm_data, endd_data, all_hists[i*4:i*4+4]
         )
         figure.savefig(
-            'plots/example_' + args.data_type + '_' + str(idx) + '.png',
+            'temp_plots/example_' + args.data_type + '_' + str(idx) + '.png',
             dpi=300, bbox_inches='tight'
         )
         plt.clf()
