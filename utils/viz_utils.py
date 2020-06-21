@@ -8,6 +8,8 @@ import seaborn as sns
 import torch
 from torchvision.transforms import ToTensor, Resize, ToPILImage
 
+from utils.turbo_cmap import turbo_cm
+
 
 def get_example_figure(ensemble_data, endd_data, hist_data):
     fig = plt.figure(figsize=(17.77, 10))
@@ -101,3 +103,28 @@ def get_tensor_with_histograms(results_dict, plot_names, model_names):
             all_hists.append(res)
 
     return torch.cat([vec.unsqueeze(0) for vec in all_hists])
+
+
+def colorize(value, vmin=0.0, vmax=1.0, cmap='turbo', numpy=False):
+    if not numpy:
+        value = value.cpu().numpy()[0, :, :]
+
+    # normalize
+    vmin = value.min() if vmin is None else vmin
+    vmax = value.max() if vmax is None else vmax
+    if vmin != vmax:
+        value = (value - vmin) / (vmax - vmin)  # vmin..vmax
+    else:
+        # Avoid 0-division
+        value = value * 0.
+    value = np.clip(value, 0.0, 1.0)
+
+    if cmap != 'turbo':
+        cmapper = matplotlib.cm.get_cmap(cmap)
+    else:
+        cmapper = turbo_cm
+    value = cmapper(value, bytes=True)  # (nxmx4)
+
+    img = value[:, :, :3]
+
+    return img.transpose((2, 0, 1))

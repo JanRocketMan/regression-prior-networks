@@ -10,29 +10,6 @@ from skimage.transform import resize
 from distributions import GaussianDiagonalMixture, NormalWishartPrior
 
 
-def _load_densenet_dict(model, load_path):
-    """
-    Load trained model from provided checkpoint file -
-    this is used when no internet on device is available"""
-    # '.'s are no longer allowed in module names, but previous _DenseLayer
-    # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
-    # They are also in the checkpoints in model_urls. This pattern is used
-    # to find such keys.
-    pattern = re.compile(
-        r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(\
-            ?:weight|bias|running_mean|running_var))$'
-    )
-
-    state_dict = torch.load(load_path)
-    for key in list(state_dict.keys()):
-        res = pattern.match(key)
-        if res:
-            new_key = res.group(1) + res.group(2)
-            state_dict[new_key] = state_dict[key]
-            del state_dict[key]
-    model.load_state_dict(state_dict)
-
-
 def reshape_images(images):
     # Support multiple RGBs, one RGB image, even grayscale
     if len(images.shape) < 3:

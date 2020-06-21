@@ -136,7 +136,7 @@ class ToTensor(object):
         if self.resize:
             depth = depth.resize((320, 240))
 
-        if self.is_test:
+        if self.is_val:
             depth = self.to_tensor(depth).float() / 10
         else:
             depth = self.to_tensor(depth).float() * 1000
