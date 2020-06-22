@@ -76,7 +76,7 @@ Please note that by default it uses all available GPUs & requires ~18.2Gb of GPU
 # ToDo
 
 - [x] Advanced visualization of results
-- [ ] Training script
+- [x] Training script
 - [ ] Evaluation on KITTI
 
 # Reference
