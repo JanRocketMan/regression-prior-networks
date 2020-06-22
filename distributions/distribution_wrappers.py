@@ -36,6 +36,14 @@ class ProbabilisticWrapper(Module):
             predicted_params = [param.cpu() for param in predicted_params]
         return self.distribution_cls(*predicted_params)
 
+    def train(self):
+        self.training = True
+        self.model.train()
+
+    def eval(self):
+        self.training = False
+        self.model.eval()
+
 
 class GaussianEnsembleWrapper(Module):
     """Wraps list of models to a Gaussian Mixture"""

@@ -54,7 +54,7 @@ if __name__ == '__main__':
         help="Type of transformation to perform with targets"
     )
     parser.add_argument(
-        '--overfit-check', dest='overfit', action='store_true', default=False,
+        '--overfit_check', dest='overfit', action='store_true', default=False,
         help="If true, uses a tiny subset of the whole train"
     )
     parser.add_argument('--max_temperature', default=10.0, type=float)

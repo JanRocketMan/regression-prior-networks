@@ -70,6 +70,7 @@ class SingleDistributionTrainer:
             self.timing_stats.reset()
 
             start_time = time()
+            self.model.train()
             for i, batch in enumerate(train_loader):
                 current_step = global_step + i
 
@@ -90,6 +91,7 @@ class SingleDistributionTrainer:
 
             global_step += len(train_loader)
 
+            self.model.eval()
             with torch.no_grad():
                 self.eval_step(val_loader, global_step, epoch)
             if save_path is not None:
@@ -179,10 +181,16 @@ class SingleDistributionTrainer:
         for mname, metric in zip(metric_names, all_metrics):
             self.logger.add_scalar("Val/" + mname, metric, current_step)
 
+        if current_step % 6336 == 0:
+            print("Eval scores", end='\t')
+            for mname, metric in zip(metric_names, all_metrics):
+                print(mname, ': %.3f' % metric, end=' ')
+            print("")
+
     def save_current_state(self, save_path, global_step, epoch):
         train_state = {
             "epoch": epoch,
-            "global_step": self.global_step,
+            "global_step": global_step,
             "optimizer": self.optimizer.state_dict(),
             "tensorboard_logdir": self.logger.logdir,
             "tensorboard_purge_step": global_step
