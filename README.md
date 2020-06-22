@@ -51,6 +51,28 @@ Finally, to get individual examples use:
 python get_nyu_samples.py --indices $DESIRED_INDICES
 ```
 
+You may retrain all Nyuv2 gaussian models with:
+
+```bash
+python nyu_train.py --checkpoint $CHECKPOINT_FOLDER_PATH --model_type "gaussian"
+```
+
+and then distil them with:
+
+```bash
+python nyu_train.py --checkpoint $CHECKPOINT_FOLDER_PATH --teacher_checkpoints $PATHS_TO_TEACHERS --model_type "nw_prior"
+```
+
+Please note that by default it uses all available GPUs & requires ~18.2Gb of GPU memory.
+
+# Training on your own data
+
+1. Wrap the output from your model using one of our distribution_wrappers.
+2. (If feasible) Train an ensemble of base models with NLL objective. You may inherit our NLLSingleDistributionTrainer or use smth similar.
+3. (If feasible) Distill to a single Prior model by inheriting from DistillationTrainer class & training with it (look at nyu_trainers for example).
+4. (If 2-3 are not feasible, but you have ood data to train on) Use NWPriorRKLTrainer class for straightforward training. It requires additional hyperparameters - ood coefficient, inverse train beta and prior ood beta. Those should be tuned - we recommend starting with 0.1, 1e-2 and 1e-2 for them respectively.
+5. During testing, wrap the output & get the prior distribution. You can get all desired uncertainties from it.
+
 # ToDo
 
 - [x] Advanced visualization of results
@@ -59,13 +81,17 @@ python get_nyu_samples.py --indices $DESIRED_INDICES
 
 # Reference
 
-@article{Malinin20,
+If you find our work useful, please cite corresponding paper:
+
+```
+@article{RPN20,
   author    = {Andrey Malinin, Sergey Chervontsev, Ivan Provilkov, Mark Gales},
   title     = {Regression Prior Networks},
   journal   = {arXiv e-prints},
   volume    = {abs/TOFILL},
-  year      = {2018},
+  year      = {TOFILL},
   url       = {TOFILL},
   eid       = {TOFILL},
   eprint    = {TOFILL}
 }
+```

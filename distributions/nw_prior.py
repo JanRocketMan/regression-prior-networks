@@ -37,6 +37,7 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return self.forward().log_prob(value)
 
     def predictive_posterior_variance(self):
+        """Returns total variance - total uncertainty"""
         variance_res = self.forward().variance
         if variance_res.size(-1) != 1:
             raise ValueError(
@@ -45,6 +46,7 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return variance_res[..., 0]
 
     def predictive_posterior_entropy(self):
+        """Returns total entropy - total uncertainty"""
         entropy_res = self.forward().entropy()
         if entropy_res.size(-1) != 1:
             raise ValueError(
@@ -53,6 +55,7 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return entropy_res[..., 0]
 
     def expected_entropy(self):
+        """Returns expected entropy - data uncertainty"""
         mvdigamma_term = mvdigamma(0.5 * self.df, self.dimensionality)
         return 0.5 * (
             self.dimensionality * (1 + math.log(2 * math.pi)) -
@@ -75,11 +78,13 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return 0.5 * (neg_mse_term + reg_terms + conf_term)
 
     def mutual_information(self):
+        """Returns mutual information - knowledge uncertainty"""
         predictive_posterior_entropy = self.predictive_posterior_entropy()
         expected_entropy = self.expected_entropy()
         return predictive_posterior_entropy - expected_entropy
 
     def expected_pairwise_kl(self):
+        """Returns expected pairwise kl divergence - knowledge uncertainty"""
         term1 = 0.5 * (
             self.df * self.dimensionality / (
                 self.df - self.dimensionality - 1
@@ -93,9 +98,11 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return term1 + term2
 
     def variance_of_expected(self):
+        """Returns variance of expected distribution - knowledge uncertainty"""
         return self.expected_variance() / self.belief
 
     def expected_variance(self):
+        """Returns expected variance - data uncertainty"""
         result = 1 / (
             self.precision_diag * (
                 self.df.unsqueeze(-1) - self.dimensionality - 1
@@ -110,6 +117,7 @@ class NormalWishartPrior(NormalDiagonalWishart):
         return result[..., 0]
 
     def total_variance(self):
+        """Duplicates total variance (sanity check)"""
         tv = self.variance_of_expected() + self.expected_variance()
         ppv = self.predictive_posterior_variance()
 

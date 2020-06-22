@@ -11,7 +11,8 @@ from distributions import NormalWishartPrior
 from utils.nyuv2_loading import getTrainingEvalData
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
-from training.distribution_trainer import NLLDistributionTrainer
+from training.nyu_trainers import NyuNLLDistributionTrainer
+from training.nyu_trainers import NyuDistillationTrainer
 from utils.model_utils import load_unet_model_from_checkpoint
 from utils.model_utils import _load_densenet_dict
 
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
     parser.add_argument(
-        '--log_dir', default="logs", type=str,
+        '--log_dir', default="", type=str,
         help='Directory to save tensorboard logs'
     )
     parser.add_argument(
@@ -84,18 +85,42 @@ if __name__ == '__main__':
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian':
         model = ProbabilisticWrapper(Normal, model)
-    elif model_type == 'nw_prior':
+    elif args.model_type == 'nw_prior':
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
         )
     print("Model created")
 
+    if args.teacher_checkpoints is not None:
+        teacher_model = load_unet_model_from_checkpoint(
+            args.teacher_checkpoints, "gaussian-ensemble", args.backbone
+        )
+
+    logdir = args.log_dir
+    if logdir == '':
+        logdir = 'logs/' + '{}-lr{}-e{}-bs{}'.format(
+            args.backbone, args.lr, args.epochs, args.bs
+        )
+
     # Create trainer
-    trainer_cls = NLLDistributionTrainer(
-        model, torch.optim.Adam, SummaryWriter, args.log_dir,
-        epochs=args.epochs,
-        additional_params={'targets_transform': args.targets_transform}
-    )
+    if args.model_type != 'nw_prior':
+        print("Training with NLL objective")
+        trainer_cls = NyuNLLDistributionTrainer(
+            model, torch.optim.Adam, SummaryWriter, logdir,
+            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
+            additional_params={'targets_transform': args.targets_transform}
+        )
+    elif args.teacher_checkpoints is not None:
+        print("Distilling with log prob")
+        max_T = args.max_temperature
+        trainer_cls = NyuDistillationTrainer(
+            teacher_model, max_T,
+            model, torch.optim.Adam, SummaryWriter, logdir,
+            args.epochs, {'lr': args.lr, 'amsgrad': True},
+            additional_params={'targets_transform': args.targets_transform}
+        )
+    else:
+        raise Exception("RKL training for Nyu currently not supported")
     print("Trainer created")
 
     # Load data

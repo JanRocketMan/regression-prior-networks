@@ -70,3 +70,13 @@ def load_unet_model_from_checkpoint(
     else:
         raise ValueError("Provided model_type is not supported")
     return model.eval()
+
+
+def switch_bn_updates(model, mode):
+    """Disables/unables accumulation of statistics in BN layers"""
+    for m in model.modules():
+        if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
+            if mode == 'train':
+                m.train()
+            elif mode == 'eval':
+                m.eval()
