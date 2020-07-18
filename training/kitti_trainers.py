@@ -44,7 +44,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         current_epoch, step_idx, steps_per_epoch
     ):
         self.logger.add_scalar('Train/Loss', self.loss_stats.val, current_step)
-        if current_step % 300 == 0:
+        if current_step % 400 == 0:
             eta = str(timedelta(
                 seconds=int(
                     self.timing_stats.val * (steps_per_epoch - step_idx)
@@ -67,6 +67,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
 
     def show_examples_and_get_val_metrics(self, val_loader, current_step):
         self.model.eval()
+        print("Current step", current_step, flush=True)
         batch = next(iter(val_loader))
         sample_img, sample_depth = batch['image'].to(self.device), \
             batch['depth'].to(self.device)
@@ -115,11 +116,11 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         for mname, metric in zip(metric_names, all_metrics):
             self.logger.add_scalar("Val/" + mname, metric, current_step)
 
-        if current_step % 6336 == 0:
-            print("Eval scores", end='\t')
-            for mname, metric in zip(metric_names, all_metrics):
-                print(mname, ': %.3f' % metric, end=' ')
-            print("")
+        #if current_step % 3300 == 0:
+        print("Eval scores", end='\t', flush=True)
+        for mname, metric in zip(metric_names, all_metrics):
+            print(mname, ': %.3f' % metric, end=' ', flush=True)
+        print("")
 
 
 class KittiDistillationTrainer(DistillationTrainer, SingleDistributionTrainer):
