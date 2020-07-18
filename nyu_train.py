@@ -6,9 +6,9 @@ from torchvision.models import densenet169
 from tensorboardX import SummaryWriter
 from torch.distributions import Normal
 
-from distributions import NormalWishartPrior
+from rpn.distributions import NormalWishartPrior
 
-from utils.nyuv2_loading import getTrainingEvalData
+from utils.data_loading import getTrainingEvalData
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
 from training.nyu_trainers import NyuNLLDistributionTrainer

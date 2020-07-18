@@ -99,7 +99,7 @@ def renorm_distribution(
 
 def predict_targets(
     model, images, minDepth=10, maxDepth=1000,
-    transform_type='scaled', device='cuda:0'
+    transform_type='scaled', device='cuda:0', clip=True
 ):
     """Use trained model to predict depths"""
     images = reshape_images(images)
@@ -116,7 +116,7 @@ def predict_targets(
     # Put in expected range
     return renorm_param(
         predictions, maxDepth=maxDepth, minDepth=minDepth,
-        transform_type=transform_type, clip=True
+        transform_type=transform_type, clip=clip
     )
 
 

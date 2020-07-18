@@ -7,7 +7,7 @@ import numpy as np
 
 import torch
 
-from utils.nyuv2_loading import load_test_data
+from utils.data_loading import load_test_data
 from utils.depth_utils import scale_up, predict_targets
 from utils.model_utils import load_unet_model_from_checkpoint
 

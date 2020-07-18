@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import re
 from torch.distributions.normal import Normal
 
 from distributions import NormalWishartPrior
@@ -9,17 +10,13 @@ from models.unet_model import UNetModel
 
 
 def _load_densenet_dict(model, load_path):
-    """
-    Load trained model from provided checkpoint file -
-    this is used when no internet on device is available"""
+    """Load trained model from provided checkpoint file - this is used when no internet on device is available"""
     # '.'s are no longer allowed in module names, but previous _DenseLayer
     # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
     # They are also in the checkpoints in model_urls. This pattern is used
     # to find such keys.
     pattern = re.compile(
-        r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(\
-            ?:weight|bias|running_mean|running_var))$'
-    )
+        r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
 
     state_dict = torch.load(load_path)
     for key in list(state_dict.keys()):
