@@ -99,7 +99,7 @@ def renorm_distribution(
 
 def predict_targets(
     model, images, minDepth=10, maxDepth=1000,
-    transform_type='scaled', device='cuda:0', clip=True
+    transform_type='scaled', device='cuda:0', clip=True, no_renorm=False
 ):
     """Use trained model to predict depths"""
     images = reshape_images(images)
@@ -113,6 +113,10 @@ def predict_targets(
         predictions = model(
             torch.FloatTensor(images).permute(0, 3, 1, 2).to(device)
         ).cpu().permute(0, 2, 3, 1)
+    if no_renorm:
+        if clip:
+            predictions = np.clip(predictions, minDepth, maxDepth)
+        return predictions
     # Put in expected range
     return renorm_param(
         predictions, maxDepth=maxDepth, minDepth=minDepth,

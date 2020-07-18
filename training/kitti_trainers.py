@@ -8,7 +8,7 @@ from training.distribution_trainer import NLLSingleDistributionTrainer, SingleDi
 from training.distillation_trainer import DistillationTrainer
 
 from evaluation.depth_testing import compute_rel_metrics
-from utils.depth_utils import DepthNorm, predict_targets
+from utils.depth_utils import predict_targets
 from utils.viz_utils import colorize
 
 
@@ -31,13 +31,15 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         inputs, targets = batch['image'].to(self.device), \
             batch['depth'].to(self.device)
         # Normalize depth
+        """
         targets_n = DepthNorm(
             targets,
-            maxDepth=1.0, 
-            minDepth=1.0,
+            maxDepth=80.0, 
+            minDepth=1e-2,
             transform_type=self.additional_params['targets_transform']
         )
-        return inputs, targets_n
+        """
+        return inputs, targets
 
     def logging_step(
         self, val_loader, current_step,
@@ -69,6 +71,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         self.model.eval()
         print("Current step", current_step, flush=True)
         batch = next(iter(val_loader))
+        
         sample_img, sample_depth = batch['image'].to(self.device), \
             batch['depth'].to(self.device)
         if current_step == 0:
@@ -80,22 +83,22 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
             self.logger.add_image(
                 'Train.2.Depth',
                 colorize(
-                    vutils.make_grid(sample_depth, nrow=6, normalize=False)
+                    vutils.make_grid(sample_depth, nrow=6, normalize=True)
                 ),
                 0
             )
-
+        print("Sample", sample_depth.mean())
         prediction = predict_targets(
             self.model, sample_img.permute(0, 2, 3, 1).cpu().numpy(),
-            minDepth=1.0, maxDepth=1.0,
+            minDepth=1e-2, maxDepth=80.0,
             transform_type=self.additional_params['targets_transform'],
-            device=self.device, clip=False
+            device=self.device, clip=True, no_renorm=True
         ).permute(0, 3, 1, 2)
-
+        print("PREDICTION ", prediction.mean())
         self.logger.add_image(
             'Train.3.Prediction',
             colorize(
-                vutils.make_grid(prediction, nrow=6, normalize=False)
+                vutils.make_grid(prediction, nrow=6, normalize=True)
             ), current_step
         )
         self.logger.add_image(
