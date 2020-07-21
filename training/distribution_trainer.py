@@ -3,6 +3,7 @@ Train a single model that was wrapped with our distribution wrappers.
 Use either NLL or RKL-based objectives
 """
 from time import time
+import os
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,7 @@ import torch.nn as nn
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from utils.func_utils import AverageMeter
 
+import torchvision.utils as vutils
 
 class SingleDistributionTrainer:
     def __init__(
@@ -37,6 +39,17 @@ class SingleDistributionTrainer:
 
         # Predict & get loss
         output_distr = self.model(inputs)
+        """
+        vutils.save_image(inputs,'/home/iv-provilkov/data/uncertainty/kitti/inputs.png', normalize=True)
+        vutils.save_image(targets, '/home/iv-provilkov/data/uncertainty/kitti/targets.png', normalize=True)
+        vutils.save_image(output_distr.mean, '/home/iv-provilkov/data/uncertainty/kitti/output.png', normalize=True)
+        print("INSIDE BATCH")
+        print("OSHAPE", output_distr.mean.shape)
+        print(inputs.min(), inputs.max())
+        print(targets.min(), targets.max())
+        print(output_distr.mean.min(), output_distr.mean.max())
+        """
+
         loss = self.loss_fn(output_distr, targets)
         return loss
 
@@ -49,7 +62,7 @@ class SingleDistributionTrainer:
         self.optimizer.step()
 
     def train(self, train_loader, val_loader, save_path=None, load_path=None):
-        if load_path is not None:
+        if load_path is not None and os.path.isfile(load_path) :
             init_epoch, global_step = self.load_current_state(load_path)
         else:
             init_epoch, global_step = 0, 0

@@ -216,7 +216,8 @@ class ToTensorKitti(object):
         
         depth = np.array(depth)/256. # Now we have depth in range [0, 80]
         depth = torch.from_numpy(depth).float()
-        
+        depth = depth.unsqueeze(0)
+
         return {'image': image, 'depth': depth}
 
 
