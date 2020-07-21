@@ -4,7 +4,7 @@ import torchvision.utils as vutils
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
-from training.distribution_trainer import NLLSingleDistributionTrainer
+from training.distribution_trainer import NLLSingleDistributionTrainer, SingleDistributionTrainer
 from training.distillation_trainer import DistillationTrainer
 
 from evaluation.depth_testing import compute_rel_metrics
