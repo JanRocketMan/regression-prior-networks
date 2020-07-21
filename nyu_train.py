@@ -6,7 +6,7 @@ from torchvision.models import densenet169
 from tensorboardX import SummaryWriter
 from torch.distributions import Normal
 
-from rpn.distributions import NormalWishartPrior
+from distributions import NormalWishartPrior
 
 from utils.data_loading import getTrainingEvalData
 from distributions.distribution_wrappers import ProbabilisticWrapper
