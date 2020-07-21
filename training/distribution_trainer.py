@@ -62,7 +62,7 @@ class SingleDistributionTrainer:
         self.optimizer.step()
 
     def train(self, train_loader, val_loader, save_path=None, load_path=None):
-        if load_path is not None and os.path.isfile(load_path) :
+        if load_path is not None and os.path.isfile(load_path + '/traindata.ckpt') :
             init_epoch, global_step = self.load_current_state(load_path)
         else:
             init_epoch, global_step = 0, 0
