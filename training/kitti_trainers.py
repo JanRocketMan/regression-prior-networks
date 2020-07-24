@@ -1,6 +1,7 @@
 """Train a single model on Kitti dataset."""
 from datetime import timedelta
 import torchvision.utils as vutils
+import numpy as np
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
@@ -46,7 +47,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         current_epoch, step_idx, steps_per_epoch
     ):
         self.logger.add_scalar('Train/Loss', self.loss_stats.val, current_step)
-        if current_step % 400 == 0:
+        if current_step % 300 == 0:
             eta = str(timedelta(
                 seconds=int(
                     self.timing_stats.val * (steps_per_epoch - step_idx)
@@ -63,6 +64,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
                     loss=self.loss_stats, eta=eta
                 )
             )
+        if current_step % 1000:
             # Record intermediate results
             self.show_examples_and_get_val_metrics(val_loader, current_step)
             self.model.train()
@@ -87,14 +89,12 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
                 ),
                 0
             )
-        print("Sample", sample_depth.mean())
         prediction = predict_targets(
             self.model, sample_img.permute(0, 2, 3, 1).cpu().numpy(),
             minDepth=1e-2, maxDepth=80.0,
             transform_type=self.additional_params['targets_transform'],
             device=self.device, clip=True, no_renorm=True
         ).permute(0, 3, 1, 2)
-        print("PREDICTION ", prediction.mean())
         self.logger.add_image(
             'Train.3.Prediction',
             colorize(
@@ -111,17 +111,27 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
             ), current_step
         )
 
-        all_metrics = compute_rel_metrics(
-            sample_depth.cpu().numpy(), prediction.cpu().numpy()
-        )
+        all_metrics_buffer = []
+        for i, batch in enumerate(val_loader):
+            sample_img, sample_depth = batch['image'].to(self.device), \
+                batch['depth'].to(self.device)
+            prediction = predict_targets(
+                self.model, sample_img.permute(0, 2, 3, 1).cpu().numpy(),
+                minDepth=1e-2, maxDepth=80.0,
+                transform_type=self.additional_params['targets_transform'],
+                device=self.device, clip=True, no_renorm=True
+            ).permute(0, 3, 1, 2)
+            all_metrics = compute_rel_metrics(
+                sample_depth.cpu().numpy(), prediction.cpu().numpy()
+            )
+            all_metrics_buffer.append(all_metrics)
         metric_names = ['delta_1', 'delta_2', 'delta_3', 'rel', 'rms', 'log10']
-
-        for mname, metric in zip(metric_names, all_metrics):
+        all_metrics_buffer = np.array(all_metrics_buffer).mean(axis=0)
+        for mname, metric in zip(metric_names, all_metrics_buffer):
             self.logger.add_scalar("Val/" + mname, metric, current_step)
 
-        #if current_step % 3300 == 0:
         print("Eval scores", end='\t', flush=True)
-        for mname, metric in zip(metric_names, all_metrics):
+        for mname, metric in zip(metric_names, all_metrics_buffer):
             print(mname, ': %.3f' % metric, end=' ', flush=True)
         print("")
 

@@ -6,7 +6,7 @@ from numpy import nan
 from evaluation.depth_testing import nyu_evaluate_performance_metrics
 from evaluation.calibration_testing import nyu_evaluate_calibration_metrics
 
-from utils.nyuv2_loading import load_test_data
+from utils.data_loading import load_test_data
 from utils.model_utils import load_unet_model_from_checkpoint
 
 

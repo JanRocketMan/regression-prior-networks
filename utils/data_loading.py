@@ -210,6 +210,8 @@ class ToTensorKitti(object):
         image = image.resize((1280, 384))
         if self.resize_depth:
             depth = depth.resize((640, 192))
+        else:
+            depth = depth.resize((1280, 384)) # Eval
         image = np.array(image)/255.
         image = torch.from_numpy(image).float()
         image = image.transpose(0,1).transpose(0,2)
@@ -265,7 +267,7 @@ def getTrainingEvalData(path, batch_size, sanity_check=False):
 
 
 
-def getTrainingEvalDataKITTI(path_to_kitti, path_to_csv_train, path_to_csv_val, batch_size):
+def getTrainingEvalDataKITTI(path_to_kitti, path_to_csv_train, path_to_csv_val, batch_size, resize_depth=True):
     """
     path_to_kitti: str with path
     path_to_csv:
@@ -282,7 +284,7 @@ def getTrainingEvalDataKITTI(path_to_kitti, path_to_csv_train, path_to_csv_val, 
     
     transformed_training = DepthDatasetKITTI(train_ar , transform=getDefaultTrainTransformKitti()
     )
-    transformed_val = DepthDatasetKITTI(val_ar, transform=getNoTransformKitti(resize_depth=True)
+    transformed_val = DepthDatasetKITTI(val_ar, transform=getNoTransformKitti(resize_depth=resize_depth)
     )
     
     train_loader = DataLoader(transformed_training, batch_size, shuffle=True)
