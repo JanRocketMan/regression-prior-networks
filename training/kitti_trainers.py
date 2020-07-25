@@ -64,7 +64,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
                     loss=self.loss_stats, eta=eta
                 )
             )
-        if current_step % 1000:
+        if current_step % 1000 == 0:
             # Record intermediate results
             self.show_examples_and_get_val_metrics(val_loader, current_step)
             self.model.train()
