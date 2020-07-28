@@ -32,17 +32,41 @@ def get_test_metrics(model, test_loader, target_transform, device):
                 transform_type=target_transform,
                 device=device, clip=True, no_renorm=True
             )[:,:,:,0]
+            if i == 0:
+                print(sample_img.shape)
+
+            prediction_flip = predict_targets(
+                model, sample_img.permute(0, 2, 3, 1).cpu().numpy()[:,:,::-1,:].copy(),
+                minDepth=1e-2, maxDepth=85.0,
+                transform_type=target_transform,
+                device=device, clip=True, no_renorm=True
+            )[:,:,:,0]
+
+            prediction_flip_np = scale_up(
+                2, prediction_flip)
 
             prediction_np = scale_up(
                 2, prediction
             )
+
             sample_depth = torch.clamp(sample_depth, 0, 80)
             prediction_np = np.clip(prediction_np[:,np.newaxis,:,:],0,80)
+            prediction_flip_np = np.clip(prediction_flip_np[:,np.newaxis,:,:],0,80)
+            prediction_np = (prediction_np + prediction_flip_np[:,:,:,::-1]) / 2.
+
+            if i == 0:
+                print(prediction_np.shape)
+            sample_np = sample_depth.cpu().numpy()
+            
+            crop = np.array([0.3324324 * prediction_np.shape[2],  0.91351351 * prediction_np.shape[2],   
+                                     0.0359477 * prediction_np.shape[3],   0.96405229 * prediction_np.shape[3]]).astype(np.int32)
+            
+            prediction_crop = prediction_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
+            sample_crop = sample_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
             #prediction_np.transpose((0,3,1,2))
 
-
             all_metrics = compute_rel_metrics(
-                sample_depth.cpu().numpy(), prediction_np
+                sample_crop, prediction_crop
             )
             all_metrics_buffer.append(all_metrics)
 
