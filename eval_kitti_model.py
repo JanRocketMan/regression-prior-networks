@@ -19,7 +19,7 @@ from torch.distributions import Normal
 
 def get_test_metrics(model, test_loader, target_transform, device):
     model.eval()
-    metric_names = ['delta_1', 'delta_2', 'delta_3', 'rel', 'rms', 'log10']
+    metric_names = ['delta_1', 'delta_2', 'delta_3', 'rel', 'rms', 'log10', 'rmse_log']
     all_metrics_buffer = []
     with torch.no_grad():
         for i, batch in tqdm(enumerate(test_loader)):
@@ -32,6 +32,7 @@ def get_test_metrics(model, test_loader, target_transform, device):
                 transform_type=target_transform,
                 device=device, clip=True, no_renorm=True
             )[:,:,:,0]
+
             if i == 0:
                 print(sample_img.shape)
 
@@ -51,22 +52,39 @@ def get_test_metrics(model, test_loader, target_transform, device):
 
             sample_depth = torch.clamp(sample_depth, 0, 80)
             prediction_np = np.clip(prediction_np[:,np.newaxis,:,:],0,80)
+
+            
             prediction_flip_np = np.clip(prediction_flip_np[:,np.newaxis,:,:],0,80)
             prediction_np = (prediction_np + prediction_flip_np[:,:,:,::-1]) / 2.
 
+            sample_np = sample_depth.cpu().numpy()
+
             if i == 0:
                 print(prediction_np.shape)
-            sample_np = sample_depth.cpu().numpy()
+                print(prediction_np.max())
+                print(sample_np.max())
+
             
-            crop = np.array([0.3324324 * prediction_np.shape[2],  0.91351351 * prediction_np.shape[2],   
-                                     0.0359477 * prediction_np.shape[3],   0.96405229 * prediction_np.shape[3]]).astype(np.int32)
-            
+            #crop = np.array([0.3324324 * prediction_np.shape[2],  0.91351351 * prediction_np.shape[2],   
+            #                         0.0359477 * prediction_np.shape[3],   0.96405229 * prediction_np.shape[3]]).astype(np.int32)
+            crop = np.array([0.0359477 * prediction_np.shape[2],  0.96405229 * prediction_np.shape[2],   
+                                     0.3324324 * prediction_np.shape[3],   0.91351351 * prediction_np.shape[3]]).astype(np.int32)  
+
+
             prediction_crop = prediction_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
             sample_crop = sample_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
-            #prediction_np.transpose((0,3,1,2))
+
+
+            prediction_crop[sample_crop==0]=0
+            prediction_crop = prediction_crop.flatten()
+            sample_crop = sample_crop.flatten()
+            
+            prediction_crop = prediction_crop[sample_crop != 0]
+            sample_crop = sample_crop[sample_crop != 0]
+
 
             all_metrics = compute_rel_metrics(
-                sample_crop, prediction_crop
+                sample_crop, prediction_crop, rmse_log=True
             )
             all_metrics_buffer.append(all_metrics)
 
