@@ -7,6 +7,7 @@ from distributions.distribution_wrappers import ProbabilisticWrapper
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import NLLSingleDistributionTrainer, SingleDistributionTrainer
 from training.distillation_trainer import DistillationTrainer
+from training.l1ssim_trainer import L1SSIMTrainer
 
 from evaluation.depth_testing import compute_rel_metrics
 from utils.depth_utils import predict_targets
@@ -136,7 +137,9 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         print("")
 
 
-class KittiDistillationTrainer(DistillationTrainer, SingleDistributionTrainer):
+class KittiDistillationTrainer(
+    DistillationTrainer, KittiNLLDistributionTrainer
+):
     def __init__(
         self, teacher_model: GaussianEnsembleWrapper, T, *args, **kwargs
     ):
@@ -145,6 +148,25 @@ class KittiDistillationTrainer(DistillationTrainer, SingleDistributionTrainer):
             teacher_model, T, *args, **kwargs
             )
 
+    def preprocess_batch(self, batch):
+        return KittiNLLDistributionTrainer.preprocess_batch(self, batch)
+
+    def logging_step(
+        self, val_loader, current_step,
+        current_epoch, step_idx, steps_per_epoch
+    ):
+        return KittiNLLDistributionTrainer.logging_step(
+            self,
+            val_loader, current_step, current_epoch, step_idx, steps_per_epoch
+        )
+
+    def show_examples_and_get_val_metrics(self, val_loader, current_step):
+        return KittiNLLDistributionTrainer.show_examples_and_get_val_metrics(
+            self, val_loader, current_step
+        )
+
+
+class KittiL1SSIMTrainer(L1SSIMTrainer, KittiNLLDistributionTrainer):
     def preprocess_batch(self, batch):
         return KittiNLLDistributionTrainer.preprocess_batch(self, batch)
 

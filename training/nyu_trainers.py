@@ -119,7 +119,7 @@ class NyuNLLDistributionTrainer(NLLSingleDistributionTrainer):
             print("")
 
 
-class NyuDistillationTrainer(DistillationTrainer, SingleDistributionTrainer):
+class NyuDistillationTrainer(DistillationTrainer, NyuNLLDistributionTrainer):
     def __init__(
         self, teacher_model: GaussianEnsembleWrapper, T, *args, **kwargs
     ):

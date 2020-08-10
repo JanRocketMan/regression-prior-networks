@@ -12,7 +12,9 @@ from utils.data_loading import getTrainingEvalDataKITTI
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
-from training.kitti_trainers import KittiNLLDistributionTrainer, KittiDistillationTrainer
+from training.kitti_trainers import KittiNLLDistributionTrainer
+from training.kitti_trainers import KittiDistillationTrainer
+from training.kitti_trainers import KittiL1SSIMTrainer
 from utils.model_utils import load_unet_model_from_checkpoint
 from utils.model_utils import _load_densenet_dict
 
@@ -105,7 +107,13 @@ if __name__ == '__main__':
         )
 
     # Create trainer
-    if args.model_type != 'nw_prior':
+    if args.model_type == 'l1-ssim':
+        print("Training with original loss")
+        trainer_cls = KittiL1SSIMTrainer(
+            model, torch.optim.Adam, SummaryWriter, logdir,
+            epochs=epochs, optimizer_args={'lr': args.lr, 'amsgrad': True}
+        )
+    elif args.model_type != 'nw_prior':
         print("Training with NLL objective")
         trainer_cls = KittiNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
