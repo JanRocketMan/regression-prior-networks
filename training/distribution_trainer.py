@@ -13,6 +13,7 @@ from utils.func_utils import AverageMeter
 
 import torchvision.utils as vutils
 
+
 class SingleDistributionTrainer:
     def __init__(
         self, model: ProbabilisticWrapper, optimizer_cls, logger_cls,
@@ -62,7 +63,7 @@ class SingleDistributionTrainer:
         self.optimizer.step()
 
     def train(self, train_loader, val_loader, save_path=None, load_path=None):
-        if load_path is not None and os.path.isfile(load_path + '/traindata.ckpt') :
+        if load_path is not None and os.path.isfile(load_path + '/traindata.ckpt'):
             init_epoch, global_step = self.load_current_state(load_path)
         else:
             init_epoch, global_step = 0, 0

@@ -6,8 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from evaluation.depth_testing import nyu_evaluate_performance_metrics, compute_rel_metrics
-from evaluation.calibration_testing import nyu_evaluate_calibration_metrics
+from evaluation.depth_testing import compute_rel_metrics
 
 from utils.data_loading import load_test_data, getTrainingEvalDataKITTI
 from utils.model_utils import load_unet_model_from_checkpoint
@@ -19,10 +18,13 @@ from torch.distributions import Normal
 
 def get_test_metrics(model, test_loader, target_transform, device):
     model.eval()
-    metric_names = ['delta_1', 'delta_2', 'delta_3', 'rel', 'rms', 'log10', 'rmse_log']
+    metric_names = [
+        'delta_1', 'delta_2', 'delta_3', 'rel',
+        'rms', 'log10', 'rmse_log'
+    ]
     all_metrics_buffer = []
     with torch.no_grad():
-        for i, batch in tqdm(enumerate(test_loader)):
+        for i, batch in tqdm(enumerate(test_loader), total=len(test_loader)):
             sample_img, sample_depth = batch['image'].to(device), \
                 batch['depth'].to(device)
 
@@ -31,57 +33,30 @@ def get_test_metrics(model, test_loader, target_transform, device):
                 minDepth=1e-2, maxDepth=85.0,
                 transform_type=target_transform,
                 device=device, clip=True, no_renorm=True
-            )[:,:,:,0]
-
-            if i == 0:
-                print(sample_img.shape)
-
-            prediction_flip = predict_targets(
-                model, sample_img.permute(0, 2, 3, 1).cpu().numpy()[:,:,::-1,:].copy(),
-                minDepth=1e-2, maxDepth=85.0,
-                transform_type=target_transform,
-                device=device, clip=True, no_renorm=True
-            )[:,:,:,0]
-
-            prediction_flip_np = scale_up(
-                2, prediction_flip)
+            )[:, :, :, 0]
 
             prediction_np = scale_up(
                 2, prediction
             )
 
-            sample_depth = torch.clamp(sample_depth, 0, 80)
-            prediction_np = np.clip(prediction_np[:,np.newaxis,:,:],0,80)
+            sample_depth = np.clip(sample_depth.cpu().numpy(), 0, 80)
+            prediction_np = np.clip(prediction_np[:, np.newaxis, :, :], 0, 80)
+            valid_mask = np.logical_and(
+                sample_depth > 0.0, sample_depth < 80.0
+            )
 
-            
-            prediction_flip_np = np.clip(prediction_flip_np[:,np.newaxis,:,:],0,80)
-            prediction_np = (prediction_np + prediction_flip_np[:,:,:,::-1]) / 2.
+            # Crop by Eigen et al.
+            eval_mask = np.zeros(valid_mask.shape)
+            gt_height, gt_width = sample_depth[0, 0].shape
+            eval_mask[
+                :, :,
+                int(0.3324324 * gt_height):int(0.91351351 * gt_height),
+                int(0.0359477 * gt_width):int(0.96405229 * gt_width)
+            ] = 1
+            valid_mask = np.logical_and(valid_mask, eval_mask)
 
-            sample_np = sample_depth.cpu().numpy()
-
-            if i == 0:
-                print(prediction_np.shape)
-                print(prediction_np.max())
-                print(sample_np.max())
-
-            
-            #crop = np.array([0.3324324 * prediction_np.shape[2],  0.91351351 * prediction_np.shape[2],   
-            #                         0.0359477 * prediction_np.shape[3],   0.96405229 * prediction_np.shape[3]]).astype(np.int32)
-            crop = np.array([0.0359477 * prediction_np.shape[2],  0.96405229 * prediction_np.shape[2],   
-                                     0.3324324 * prediction_np.shape[3],   0.91351351 * prediction_np.shape[3]]).astype(np.int32)  
-
-
-            prediction_crop = prediction_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
-            sample_crop = sample_np[:,:,crop[0]:crop[1]+1, crop[2]: crop[2]+1]
-
-
-            prediction_crop[sample_crop==0]=0
-            prediction_crop = prediction_crop.flatten()
-            sample_crop = sample_crop.flatten()
-            
-            prediction_crop = prediction_crop[sample_crop != 0]
-            sample_crop = sample_crop[sample_crop != 0]
-
+            sample_crop = sample_depth[valid_mask]
+            prediction_crop = prediction_np[valid_mask]
 
             all_metrics = compute_rel_metrics(
                 sample_crop, prediction_crop, rmse_log=True
@@ -99,7 +74,6 @@ if __name__ == '__main__':
     parser = ArgumentParser(
         description='Evaluation of trained KITTI'
     )
-    
     parser.add_argument(
         '--checkpoint',
         default=['checkpoints/dense_depth_gaussian/1/19.ckpt'],
@@ -110,7 +84,6 @@ if __name__ == '__main__':
     ])
     parser.add_argument('--path_to_kitti', type=str)
     parser.add_argument('--path_to_csv_test', type=str)
-    
     parser.add_argument('--bs', type=int, default=6)
     parser.add_argument('--model_type', default='gaussian', choices=[
         'gaussian', 'gaussian-ensemble', 'nw_prior', 'l1-ssim'
@@ -129,12 +102,14 @@ if __name__ == '__main__':
     )
     model.eval()
     _, test_loader = getTrainingEvalDataKITTI(
-        path_to_kitti=args.path_to_kitti, 
+        path_to_kitti=args.path_to_kitti,
         path_to_csv_train=args.path_to_csv_test,
         path_to_csv_val=args.path_to_csv_test,
         batch_size=args.bs,
         resize_depth=False
     )
 
-
-    get_test_metrics(model, test_loader, target_transform=args.targets_transform, device=args.device)
+    get_test_metrics(
+        model, test_loader, target_transform=args.targets_transform,
+        device=args.device
+    )

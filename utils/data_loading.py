@@ -1,4 +1,6 @@
-"""A code to load & augment Nyu v2 dataset. Adapted from https://github.com/ialhashim/DenseDepth"""
+"""A code to load & augment Nyu v2 or KITTI dataset.
+Adapted from https://github.com/ialhashim/DenseDepth
+"""
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -123,18 +125,27 @@ class depthDatasetMemory(Dataset):
     def __len__(self):
         return len(self.nyu_dataset)
 
+
+import cv2
+
+
 class DepthDatasetKITTI(Dataset):
     def __init__(self, data, transform=None):
         """
-        data: list with lists of two paths to images: [[rgb_path, depth_path], ...]
+        data: list with lists of two paths to images:
+            [[rgb_path, depth_path], ...]
         """
         self.data = data
         self.transform = transform
 
     def __getitem__(self, idx):
         image = Image.open(self.data[idx][0])
-        depth = np.load(self.data[idx][1])
-        depth = Image.fromarray(np.uint16(depth*256))
+        if self.data[idx][1][-3:] == 'png':
+            depth = cv2.imread('/' + self.data[idx][1].split('//')[1], -1)
+            depth = Image.fromarray(np.uint16(depth))
+        else:
+            depth = np.load(self.data[idx][1])
+            depth = Image.fromarray(np.uint16(depth*256))
         sample = {'image': image, 'depth': depth}
         if self.transform:
             sample = self.transform(sample)
@@ -211,12 +222,12 @@ class ToTensorKitti(object):
         if self.resize_depth:
             depth = depth.resize((640, 192))
         else:
-            depth = depth.resize((1280, 384)) # Eval
+            depth = depth.resize((1280, 384), resample=Image.NEAREST)  # Eval
         image = np.array(image)/255.
         image = torch.from_numpy(image).float()
-        image = image.transpose(0,1).transpose(0,2)
-        
-        depth = np.array(depth)/256. # Now we have depth in range [0, 80]
+        image = image.transpose(0, 1).transpose(0, 2)
+
+        depth = np.array(depth)/256.  # Now we have depth in range [0, 80]
         depth = torch.from_numpy(depth).float()
         depth = depth.unsqueeze(0)
 
@@ -242,6 +253,7 @@ def getNoTransformKitti(resize_depth=False):
         ToTensorKitti(resize_depth=resize_depth)
     ])
 
+
 def getDefaultTrainTransformKitti():
     return transforms.Compose([
         RandomHorizontalFlip(),
@@ -266,8 +278,10 @@ def getTrainingEvalData(path, batch_size, sanity_check=False):
     return train_loader, val_loader
 
 
-
-def getTrainingEvalDataKITTI(path_to_kitti, path_to_csv_train, path_to_csv_val, batch_size, resize_depth=True):
+def getTrainingEvalDataKITTI(
+    path_to_kitti, path_to_csv_train, path_to_csv_val,
+    batch_size, resize_depth=True
+):
     """
     path_to_kitti: str with path
     path_to_csv:
@@ -281,12 +295,14 @@ def getTrainingEvalDataKITTI(path_to_kitti, path_to_csv_train, path_to_csv_val, 
         path_to_kitti += '/'
     train_ar = path_to_kitti + pd.read_csv(path_to_csv_train).values
     val_ar = path_to_kitti + pd.read_csv(path_to_csv_val).values
-    
-    transformed_training = DepthDatasetKITTI(train_ar , transform=getDefaultTrainTransformKitti()
+
+    transformed_training = DepthDatasetKITTI(
+        train_ar, transform=getDefaultTrainTransformKitti()
     )
-    transformed_val = DepthDatasetKITTI(val_ar, transform=getNoTransformKitti(resize_depth=resize_depth)
+    transformed_val = DepthDatasetKITTI(
+        val_ar, transform=getNoTransformKitti(resize_depth=resize_depth)
     )
-    
+
     train_loader = DataLoader(transformed_training, batch_size, shuffle=True)
     val_loader = DataLoader(transformed_val, batch_size, shuffle=False)
 

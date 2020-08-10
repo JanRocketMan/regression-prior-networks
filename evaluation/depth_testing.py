@@ -12,15 +12,21 @@ from utils.depth_utils import scale_up, predict_targets
 from utils.model_utils import load_unet_model_from_checkpoint
 
 
-def compute_rel_metrics(gt, pred):
+def compute_rel_metrics(gt, pred, rmse_log=False):
     """Computes \\delta, rel, rms and log_10 scores"""
     thresh = np.maximum((gt / pred), (pred / gt))
     a1 = (thresh < 1.25).mean()
     a2 = (thresh < 1.25 ** 2).mean()
     a3 = (thresh < 1.25 ** 3).mean()
+
     abs_rel = np.mean(np.abs(gt - pred) / gt)
     rmse = np.sqrt(np.mean((gt - pred) ** 2))
     log_10 = (np.abs(np.log10(gt) - np.log10(pred))).mean()
+
+    if rmse_log:
+        rmse_log = (np.log(gt) - np.log(pred)) ** 2
+        rmse_log = np.sqrt(rmse_log.mean())
+        return a1, a2, a3, abs_rel, rmse, log_10, rmse_log
     return a1, a2, a3, abs_rel, rmse, log_10
 
 

@@ -127,7 +127,7 @@ if __name__ == '__main__':
 
     # Load data
     train_loader, val_loader = getTrainingEvalDataKITTI(
-        path_to_kitti=args.path_to_kitti, 
+        path_to_kitti=args.path_to_kitti,
         path_to_csv_train=args.path_to_csv_train,
         path_to_csv_val=args.path_to_csv_val,
         batch_size=args.bs,
