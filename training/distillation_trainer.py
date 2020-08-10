@@ -134,9 +134,9 @@ class DistillationTrainer(SingleDistributionTrainer):
         for i in range(len(smoothed_means)):
             all_losses.append(
                 -output_distr.log_prob(
-                    smoothed_means[i].permute(0, 2, 3, 1).to(self.device),
+                    smoothed_means[i].unsqueeze(-1).to(self.device),
                     1.0 / (
-                        smoothed_vars[i].permute(0, 2, 3, 1).to(self.device) +
+                        smoothed_vars[i].unsqueeze(-1).to(self.device) +
                         1e-5
                     )
                 ).mean()
