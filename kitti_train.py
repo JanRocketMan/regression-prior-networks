@@ -111,7 +111,7 @@ if __name__ == '__main__':
         print("Training with original loss")
         trainer_cls = KittiL1SSIMTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
-            epochs=epochs, optimizer_args={'lr': args.lr, 'amsgrad': True}
+            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True}
         )
     elif args.model_type != 'nw_prior':
         print("Training with NLL objective")

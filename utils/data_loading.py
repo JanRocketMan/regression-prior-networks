@@ -220,7 +220,7 @@ class ToTensorKitti(object):
         image, depth = sample['image'], sample['depth']
         image = image.resize((1280, 384))
         if self.resize_depth:
-            depth = depth.resize((640, 192))
+            depth = depth.resize((640, 192), resample=Image.NEAREST)
         else:
             depth = depth.resize((1280, 384), resample=Image.NEAREST)  # Eval
         image = np.array(image)/255.

@@ -1,3 +1,5 @@
+from torch import clamp as t_clamp
+from torch.nn import L1Loss
 from training.distribution_trainer import SingleDistributionTrainer
 from utils.ssim_gradient_losses import ssim, image_gradient_loss
 
@@ -5,8 +7,8 @@ from utils.ssim_gradient_losses import ssim, image_gradient_loss
 class L1SSIMTrainer(SingleDistributionTrainer):
     def loss_fn(self, output_distr, targets):
         output = output_distr
-        l_depth = nn.L1Loss()(output, targets)
-        l_ssim = torch.clamp(
+        l_depth = L1Loss()(output, targets)
+        l_ssim = t_clamp(
             (1 - ssim(output, targets, val_range=80.0)) * 0.5,
             0, 1
         )
