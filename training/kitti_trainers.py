@@ -151,6 +151,9 @@ class KittiDistillationTrainer(
     def preprocess_batch(self, batch):
         return KittiNLLDistributionTrainer.preprocess_batch(self, batch)
 
+    def train_step(self, batch):
+        return DistillationTrainer.train_step(self, batch)
+
     def logging_step(
         self, val_loader, current_step,
         current_epoch, step_idx, steps_per_epoch
