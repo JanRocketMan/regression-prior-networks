@@ -136,6 +136,7 @@ data/*
 
 # Logs and checkpoints
 logs/*
+logs2/*
 checkpoints/*
 plots/tmp.png
 

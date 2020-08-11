@@ -36,13 +36,15 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         if ood_loader is None:
             raise Exception("Training with RKL objectives requires OOD data.")
         self.estimate_targets_avg_mean_var(train_loader)  # Required for Prior
-        mixed_loader = zip(dataloader, cycle(oodloader))
+        mixed_loader = zip(train_loader, cycle(ood_loader))
         """
         With only zip() the iterator will be exhausted when the length
         is equal to that of the smallest dataset.
         But with the use of cycle(), we will repeat the smallest dataset again
         unless our iterator looks at all the samples from the largest dataset.
         """
+        self.max_steps = len(train_loader) * self.epochs
+        self.len_train_loader = len(train_loader)
         super(NWPriorRKLTrainer, self).train(
             mixed_loader, val_loader, save_path, load_path
         )
@@ -69,12 +71,13 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         id_loss = self.loss_fn(
             id_output_distr, id_prior_distr, id_targets
         )
+
         return id_loss + self.loss_params["ood_coeff"] * ood_loss
 
     def loss_fn(self, predicted_distr, prior_distr, targets=None):
         if targets is not None:
             return -predicted_distr.expected_log_prob(
-                targets
+                targets.unsqueeze(-1)
             ).mean() + self.loss_params["inv_real_beta"] * kl_divergence(
                 predicted_distr, prior_distr
             ).mean()
@@ -87,14 +90,13 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         prior_mean = torch.repeat_interleave(
             self.avg_mean.unsqueeze(0), repeats=inputs.size(0), dim=0
         ).to(inputs.device)
-        prior_precision = torch.repeat_interleave(
-            (1 / (prior_nu * self.avg_scatter.unsqueeze(0))),
-            repeats=inputs.size(0), dim=0
-        ).to(inputs.device)
         prior_beta = self.loss_params['prior_beta'] * torch.ones_like(
             prior_mean
         ).to(self.device)
         prior_kappa, prior_nu = prior_beta, prior_beta + prior_mean.size(1) + 1
+        prior_precision = (
+            1 / (prior_nu * self.avg_scatter.unsqueeze(0))
+        ).to(inputs.device)
 
         all_params = [
             prior_mean.unsqueeze(-1), prior_precision.unsqueeze(-1),
@@ -104,20 +106,26 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
 
     def estimate_targets_avg_mean_var(self, dataloader):
         """Computes average statistics of a given dataset"""
+        print("Computing average stats for prior distr...")
         self.avg_mean = None
-        for batch in dataloader:
+        for i, batch in enumerate(dataloader):
             _, y = self.preprocess_batch(batch)
             if self.avg_mean is None:
-                self.avg_mean = y.mean(dim=0) / len(dataloader)
+                self.avg_mean = y.mean(dim=0) / min(200, len(dataloader))
             else:
-                self.avg_mean += y.mean(dim=0) / len(dataloader)
+                self.avg_mean += y.mean(dim=0) / min(200, len(dataloader))
+            if i > 200:
+                break
         sum_var = torch.zeros_like(self.avg_mean)
         num_samples = 0
-        for _, batch in dataloader:
+        for i, batch in enumerate(dataloader):
             _, y = self.preprocess_batch(batch)
             avg_mean = torch.repeat_interleave(
                 self.avg_mean.unsqueeze(0), repeats=y.size(0), dim=0
             )
             sum_var += (y - avg_mean).pow(2).sum(dim=0)
             num_samples += y.size(0)
+            if i > 200:
+                break
         self.avg_scatter = sum_var / num_samples
+        print("Finished, starting training...")

@@ -40,16 +40,6 @@ class SingleDistributionTrainer:
 
         # Predict & get loss
         output_distr = self.model(inputs)
-        """
-        vutils.save_image(inputs,'/home/iv-provilkov/data/uncertainty/kitti/inputs.png', normalize=True)
-        vutils.save_image(targets, '/home/iv-provilkov/data/uncertainty/kitti/targets.png', normalize=True)
-        vutils.save_image(output_distr.mean, '/home/iv-provilkov/data/uncertainty/kitti/output.png', normalize=True)
-        print("INSIDE BATCH")
-        print("OSHAPE", output_distr.mean.shape)
-        print(inputs.min(), inputs.max())
-        print(targets.min(), targets.max())
-        print(output_distr.mean.min(), output_distr.mean.max())
-        """
 
         loss = self.loss_fn(output_distr, targets)
         return loss
@@ -69,7 +59,11 @@ class SingleDistributionTrainer:
             init_epoch, global_step = 0, 0
             self.logger = self.logger_cls(logdir=self.logger_logdir)
 
-        self.max_steps = len(train_loader) * self.epochs
+        if not hasattr(self, 'max_steps'):
+            self.max_steps = len(train_loader) * self.epochs
+            self.len_train_loader = len(train_loader)
+
+        print("Starting training for %d steps" % self.max_steps)
 
         for epoch in range(init_epoch, self.epochs):
             self.loss_stats.reset()
@@ -88,7 +82,7 @@ class SingleDistributionTrainer:
                 with torch.no_grad():
                     self.logging_step(
                         val_loader, current_step,
-                        epoch, i, len(train_loader)
+                        epoch, i, self.len_train_loader
                     )
 
                 elapsed_time = time() - start_time
@@ -96,7 +90,7 @@ class SingleDistributionTrainer:
                 self.loss_stats.update(loss.item())
                 start_time = time()
 
-            global_step += len(train_loader)
+            global_step += self.len_train_loader
 
             self.model.eval()
             with torch.no_grad():
