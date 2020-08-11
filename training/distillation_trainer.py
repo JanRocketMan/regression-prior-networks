@@ -27,57 +27,6 @@ class DistillationTrainer(SingleDistributionTrainer):
         output_distr = self.model(inputs)
         loss = self.distill_loss_fn(output_distr, teacher_distr, targets)
 
-        self.logger.add_scalar(
-            'Teacher/Teacher_mean_mean',
-            teacher_distr.mean.mean().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'Teacher/Teacher_mean_std',
-            teacher_distr.mean.std().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'Teacher/Teacher_tv_mean',
-            teacher_distr.total_variance().mean().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'Teacher/Teacher_tv_std',
-            teacher_distr.total_variance().std().item(),
-            self.current_step
-        )
-
-        self.logger.add_scalar(
-            'NWP/Output_mean_mean',
-            output_distr.mean.mean().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'NWP/Output_mean_std',
-            output_distr.mean.std().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'NWP/Output_belief_mean',
-            output_distr.belief.mean().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'NWP/Output_belief_std',
-            output_distr.belief.std().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'NWP/Output_precision_mean',
-            output_distr.precision_diag.mean().item(),
-            self.current_step
-        )
-        self.logger.add_scalar(
-            'NWP/Output_precision_std',
-            output_distr.precision_diag.std().item(),
-            self.current_step
-        )
         return loss
 
     def get_current_temperature(self):

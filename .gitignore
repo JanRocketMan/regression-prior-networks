@@ -142,3 +142,4 @@ plots/tmp.png
 # VS code settings
 .vscode/*
 
+eigen_test.csv

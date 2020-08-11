@@ -32,15 +32,6 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
     def preprocess_batch(self, batch):
         inputs, targets = batch['image'].to(self.device), \
             batch['depth'].to(self.device)
-        # Normalize depth
-        """
-        targets_n = DepthNorm(
-            targets,
-            maxDepth=80.0, 
-            minDepth=1e-2,
-            transform_type=self.additional_params['targets_transform']
-        )
-        """
         return inputs, targets
 
     def logging_step(
@@ -65,7 +56,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
                     loss=self.loss_stats, eta=eta
                 )
             )
-        if current_step % 1000 == 0:
+        if current_step % 10000 == 0:
             # Record intermediate results
             self.show_examples_and_get_val_metrics(val_loader, current_step)
             self.model.train()
@@ -74,7 +65,7 @@ class KittiNLLDistributionTrainer(NLLSingleDistributionTrainer):
         self.model.eval()
         print("Current step", current_step, flush=True)
         batch = next(iter(val_loader))
-        
+
         sample_img, sample_depth = batch['image'].to(self.device), \
             batch['depth'].to(self.device)
         if current_step == 0:
