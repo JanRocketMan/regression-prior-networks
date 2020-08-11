@@ -12,7 +12,7 @@ from utils.data_loading import getTrainingEvalData
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
 from training.nyu_trainers import NyuNLLDistributionTrainer
-from training.nyu_trainers import NyuDistillationTrainer
+from training.nyu_trainers import NyuDistillationTrainer, NyuRKLTrainer
 from utils.model_utils import load_unet_model_from_checkpoint
 from utils.model_utils import _load_densenet_dict
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3
+        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3
     }[args.model_type]
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian':
         model = ProbabilisticWrapper(Normal, model)
-    elif args.model_type == 'nw_prior':
+    elif args.model_type == 'nw_prior' or args.model_type == 'nw_prior_rkl':
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
         )
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         )
 
     # Create trainer
-    if args.model_type != 'nw_prior':
+    if args.model_type == 'gaussian':
         print("Training with NLL objective")
         trainer_cls = NyuNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
@@ -119,6 +119,22 @@ if __name__ == '__main__':
             args.epochs, {'lr': args.lr, 'amsgrad': True},
             additional_params={'targets_transform': args.targets_transform}
         )
+    elif args.model_type == 'nw_prior_rkl':
+        print("Performing RKL training with custom OOD data")
+        ood_loader, _ = getTrainingEvalData(
+            path=args.zip_folder + '/nyu_ood_church.zip', batch_size=args.bs,
+            sanity_check=args.overfit, is_ood=True
+        )
+        trainer_cls = NyuRKLTrainer(
+            model, torch.optim.Adam, SummaryWriter, logdir,
+            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
+            additional_params={
+                'targets_transform': args.targets_transform,
+                'inv_real_beta': 1e-2,
+                'ood_coeff': 1.0,
+                'prior_beta': 1e-2
+            }
+        )
     else:
         raise Exception("RKL training for Nyu currently not supported")
     print("Trainer created")
@@ -131,6 +147,12 @@ if __name__ == '__main__':
     print("Data loaded")
 
     print("Training...")
-    trainer_cls.train(
-        train_loader, val_loader, args.checkpoint, args.state_dict
-    )
+    if args.model_type == 'nw_prior_rkl':
+        trainer_cls.train(
+            train_loader, val_loader, ood_loader,
+            args.checkpoint, args.state_dict
+        )
+    else:
+        trainer_cls.train(
+            train_loader, val_loader, args.checkpoint, args.state_dict
+        )

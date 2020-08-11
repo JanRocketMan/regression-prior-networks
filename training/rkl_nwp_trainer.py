@@ -6,6 +6,7 @@ import torch
 from torch.distributions.kl import kl_divergence
 
 from itertools import cycle
+from distributions.distribution_wrappers import ProbabilisticWrapper
 from distributions import NormalWishartPrior
 from training.distribution_trainer import SingleDistributionTrainer
 from utils.model_utils import switch_bn_updates

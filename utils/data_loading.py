@@ -36,20 +36,26 @@ def load_test_data(zip_path):
 
 class RandomHorizontalFlip(object):
     def __call__(self, sample):
-        image, depth = sample['image'], sample['depth']
+        image = sample['image']
 
         if not _is_pil_image(image):
             raise TypeError(
                 'img should be PIL Image. Got {}'.format(type(image)))
-        if not _is_pil_image(depth):
-            raise TypeError(
-                'img should be PIL Image. Got {}'.format(type(depth)))
+        if 'depth' in sample.keys():
+            depth = sample['depth']
+            if not _is_pil_image(depth):
+                raise TypeError(
+                    'img should be PIL Image. Got {}'.format(type(depth)))
 
         if random.random() < 0.5:
             image = image.transpose(Image.FLIP_LEFT_RIGHT)
-            depth = depth.transpose(Image.FLIP_LEFT_RIGHT)
+            if 'depth' in sample.keys():
+                depth = depth.transpose(Image.FLIP_LEFT_RIGHT)
 
-        return {'image': image, 'depth': depth}
+        if 'depth' in sample.keys():
+            return {'image': image, 'depth': depth}
+        else:
+            return {'image': image}
 
 
 class RandomChannelSwap(object):
@@ -59,15 +65,18 @@ class RandomChannelSwap(object):
         self.indices = list(permutations(range(3), 3))
 
     def __call__(self, sample):
-        image, depth = sample['image'], sample['depth']
+        image = sample['image']
         if not _is_pil_image(image):
             raise TypeError('img should be PIL Image. Got {}'.format(
                     type(image))
             )
-        if not _is_pil_image(depth):
-            raise TypeError('img should be PIL Image. Got {}'.format(
-                    type(depth))
-            )
+
+        if 'depth' in sample.keys():
+            depth = sample['depth']
+            if not _is_pil_image(depth):
+                raise TypeError('img should be PIL Image. Got {}'.format(
+                        type(depth))
+                )
         if random.random() < self.probability:
             image = np.asarray(image)
             image = Image.fromarray(
@@ -78,23 +87,31 @@ class RandomChannelSwap(object):
                     )
                 ]
             )
-        return {'image': image, 'depth': depth}
+        if 'depth' in sample.keys():
+            return {'image': image, 'depth': depth}
+        else:
+            return {'image': image}
 
 
-def loadZipToMem(zip_file, sanity_check=False):
+def loadZipToMem(zip_file, sanity_check=False, is_ood=False):
     # Load zip file into memory
     print('Loading dataset zip file...', end='')
+    if is_ood:
+        print('Loading out-of-domain zip file...', end='')
+    else:
+        print('Loading dataset zip file...', end='')
     from zipfile import ZipFile
     input_zip = ZipFile(zip_file)
     data = {name: input_zip.read(name) for name in input_zip.namelist()}
+    l_beg = 'ood_data' if is_ood else 'data'
     nyu2_train = list(
         (row.split(',') for row in (
-            data['data/nyu2_train.csv']
+            data[l_beg + '/nyu2_train.csv']
         ).decode("utf-8").split('\n') if len(row) > 0)
     )
     nyu2_val = list(
         (row.split(',') for row in (
-            data['data/nyu2_test.csv']
+            data[l_beg + '/nyu2_test.csv']
         ).decode("utf-8").split('\n') if len(row) > 0)
     )
     from sklearn.utils import shuffle
@@ -109,15 +126,20 @@ def loadZipToMem(zip_file, sanity_check=False):
 
 
 class depthDatasetMemory(Dataset):
-    def __init__(self, data, nyu2_train, transform=None):
+    def __init__(self, data, nyu2_train, transform=None, is_ood=False):
         self.data, self.nyu_dataset = data, nyu2_train
         self.transform = transform
+        self.is_ood = is_ood
 
     def __getitem__(self, idx):
         sample = self.nyu_dataset[idx]
-        image = Image.open(BytesIO(self.data[sample[0]]))
-        depth = Image.open(BytesIO(self.data[sample[1]]))
-        sample = {'image': image, 'depth': depth}
+        if self.is_ood:
+            image = Image.open(BytesIO(self.data[sample[0]]))
+            sample = {'image': image.resize((640, 480))}
+        else:
+            image = Image.open(BytesIO(self.data[sample[0]]))
+            depth = Image.open(BytesIO(self.data[sample[1]]))
+            sample = {'image': image, 'depth': depth}
         if self.transform:
             sample = self.transform(sample)
         return sample
@@ -161,22 +183,25 @@ class ToTensor(object):
         self.resize = resize
 
     def __call__(self, sample):
-        image, depth = sample['image'], sample['depth']
+        image = sample['image']
 
         image = self.to_tensor(image)
 
-        if self.resize:
-            depth = depth.resize((320, 240))
+        if 'depth' in sample.keys():
+            depth = sample['depth']
+            if self.resize:
+                depth = depth.resize((320, 240))
 
-        if self.is_val:
-            depth = self.to_tensor(depth).float() / 10
+            if self.is_val:
+                depth = self.to_tensor(depth).float() / 10
+            else:
+                depth = self.to_tensor(depth).float() * 1000
+
+            # put in expected range
+            depth = torch.clamp(depth, 0, 1000)
+            return {'image': image, 'depth': depth}
         else:
-            depth = self.to_tensor(depth).float() * 1000
-
-        # put in expected range
-        depth = torch.clamp(depth, 0, 1000)
-
-        return {'image': image, 'depth': depth}
+            return {'image': image}
 
     def to_tensor(self, pic):
         if not(_is_pil_image(pic) or _is_numpy_image(pic)):
@@ -262,14 +287,16 @@ def getDefaultTrainTransformKitti():
     ])
 
 
-def getTrainingEvalData(path, batch_size, sanity_check=False):
-    data, nyu2_train, nyu2_val = loadZipToMem(path, sanity_check=sanity_check)
+def getTrainingEvalData(path, batch_size, sanity_check=False, is_ood=False):
+    data, nyu2_train, nyu2_val = loadZipToMem(
+        path, sanity_check=sanity_check, is_ood=is_ood
+    )
 
     transformed_training = depthDatasetMemory(
-        data, nyu2_train, transform=getDefaultTrainTransform()
+        data, nyu2_train, transform=getDefaultTrainTransform(), is_ood=is_ood
     )
     transformed_val = depthDatasetMemory(
-        data, nyu2_val, transform=getNoTransform(is_val=True)
+        data, nyu2_val, transform=getNoTransform(is_val=True), is_ood=is_ood
     )
 
     train_loader = DataLoader(transformed_training, batch_size, shuffle=True)

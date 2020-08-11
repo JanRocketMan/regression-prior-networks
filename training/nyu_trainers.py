@@ -6,6 +6,7 @@ from distributions.distribution_wrappers import ProbabilisticWrapper
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import NLLSingleDistributionTrainer, SingleDistributionTrainer
 from training.distillation_trainer import DistillationTrainer
+from training.rkl_nwp_trainer import NWPriorRKLTrainer
 
 from evaluation.depth_testing import compute_rel_metrics
 from utils.depth_utils import DepthNorm, predict_targets
@@ -130,6 +131,28 @@ class NyuDistillationTrainer(DistillationTrainer, NyuNLLDistributionTrainer):
 
     def preprocess_batch(self, batch):
         return NyuNLLDistributionTrainer.preprocess_batch(self, batch)
+
+    def logging_step(
+        self, val_loader, current_step,
+        current_epoch, step_idx, steps_per_epoch
+    ):
+        return NyuNLLDistributionTrainer.logging_step(
+            self,
+            val_loader, current_step, current_epoch, step_idx, steps_per_epoch
+        )
+
+    def show_examples_and_get_val_metrics(self, val_loader, current_step):
+        return NyuNLLDistributionTrainer.show_examples_and_get_val_metrics(
+            self, val_loader, current_step
+        )
+
+
+class NyuRKLTrainer(NWPriorRKLTrainer, NyuNLLDistributionTrainer):
+    def preprocess_batch(self, batch):
+        return NyuNLLDistributionTrainer.preprocess_batch(self, batch)
+
+    def preprocess_ood_batch(self, batch):
+        return batch['image'].to(self.device)
 
     def logging_step(
         self, val_loader, current_step,
