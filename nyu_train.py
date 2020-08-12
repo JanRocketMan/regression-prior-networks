@@ -59,6 +59,9 @@ if __name__ == '__main__':
         help="If true, uses a tiny subset of the whole train"
     )
     parser.add_argument('--max_temperature', default=10.0, type=float)
+    parser.add_argument('--rkl_inv_beta', default=1e-2, type=float)
+    parser.add_argument('--rkl_ood_coeff', default=1.0, type=float)
+    parser.add_argument('--rkl_prior_beta', default=1e-2, type=float)
     args = parser.parse_args()
 
     for path in [args.checkpoint, args.zip_folder]:
@@ -130,9 +133,9 @@ if __name__ == '__main__':
             epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
             additional_params={
                 'targets_transform': args.targets_transform,
-                'inv_real_beta': 1e-2,
-                'ood_coeff': 1.0,
-                'prior_beta': 1e-2
+                'inv_real_beta': args.rkl_inv_beta,
+                'ood_coeff': args.rkl_ood_coeff,
+                'prior_beta': args.rkl_prior_beta
             }
         )
     else:
