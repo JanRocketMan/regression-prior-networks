@@ -211,7 +211,7 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         prior_beta = self.loss_params['prior_beta'] * torch.ones_like(
             prior_mean
         ).to(self.device)
-        prior_kappa, prior_nu = prior_beta, prior_beta + prior_mean.size(1) + 1
+        prior_kappa, prior_nu = prior_beta, prior_beta + prior_mean.size(1) + 2 #!
         prior_precision = (
             1 / (prior_nu * self.avg_scatter.unsqueeze(0))
         ).to(inputs.device)
