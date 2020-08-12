@@ -2,6 +2,7 @@
 Train a single model that is wrapped into NormalWishartPrior distribution.
 Uses RKL-based objective (see formula 11 in our paper).
 """
+from time import time
 import torch
 from torch.distributions.kl import kl_divergence
 
@@ -64,7 +65,7 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
                     batch_ood = next(ood_iterator)
                 except StopIteration:
                     ood_iterator = iter(ood_loader)
-                    batch_ood = next(ood_loader)
+                    batch_ood = next(ood_iterator)
                 batch = (batch, batch_ood)
 
                 current_step = global_step + i
@@ -92,27 +93,6 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
                 self.eval_step(val_loader, global_step, epoch)
             if save_path is not None:
                 self.save_current_state(save_path, global_step, epoch)
-
-    def train(
-        self, train_loader, val_loader,
-        ood_loader=None, save_path=None, load_path=None
-    ):
-        if ood_loader is None:
-            raise Exception("Training with RKL objectives requires OOD data.")
-        self.estimate_targets_avg_mean_var(train_loader)  # Required for Prior
-        mixed_loader = zip(train_loader, ood_loader)
-        #mixed_loader = zip(train_loader, cycle(ood_loader))
-        """
-        With only zip() the iterator will be exhausted when the length
-        is equal to that of the smallest dataset.
-        But with the use of cycle(), we will repeat the smallest dataset again
-        unless our iterator looks at all the samples from the largest dataset.
-        """
-        self.max_steps = len(train_loader) * self.epochs
-        self.len_train_loader = len(train_loader)
-        super(NWPriorRKLTrainer, self).train(
-            mixed_loader, val_loader, save_path, load_path
-        )
 
     def preprocess_ood_batch(self, batch):
         return batch.to(self.device)
@@ -154,6 +134,14 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         id_loss = self.loss_fn(
             id_output_distr, id_prior_distr, id_targets
         )
+        if self.current_step == 1:
+            import torchvision.utils as vutils
+            vutils.save_image(id_inputs.cpu(), "id_ex.png", nrow=3)
+            vutils.save_image(ood_inputs.cpu(), "ood_ex.png", nrow=3)
+            print("ID:", id_inputs.shape, id_inputs.min(), id_inputs.max(), id_inputs.mean(), id_inputs.std())
+            print("OOD:", ood_inputs.shape, ood_inputs.min(), ood_inputs.max(), ood_inputs.mean(), ood_inputs.std())
+            print("ID targets:", id_targets.shape, id_targets.min(), id_targets.max(), id_targets.mean(), id_targets.std())
+            vutils.save_image(id_targets.cpu().repeat(1, 3, 1, 1), "id_targets.png", nrow=3, normalize=True)
 
         for param_n in ['loc', 'precision_diag', 'belief']:
             self.logger.add_scalar(
