@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from evaluation.ood_testing import load_ood_data, nyu_evaluate_ood_auc_scores
+from evaluation.ood_testing import load_ood_data_kitti, nyu_evaluate_ood_auc_scores
 
 from utils.data_loading import load_test_data
 from utils.model_utils import load_unet_model_from_checkpoint
@@ -42,8 +42,8 @@ if __name__ == '__main__':
         args.checkpoint, args.model_type, args.backbone, args.device
     )
 
-    rgb = load_ood_data(args.indomain_folder, itype='kitti')
-    ood_rgb = load_ood_data(args.ood_folder, itype=args.ood_type)
+    rgb = load_ood_data_kitti(args.indomain_folder, itype='kitti')
+    ood_rgb = load_ood_data_kitti(args.ood_folder, itype=args.ood_type)
 
     all_aucs = nyu_evaluate_ood_auc_scores(
         model, rgb, ood_rgb, args.measures,

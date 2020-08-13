@@ -30,6 +30,25 @@ def load_ood_data(files_path, itype='kitti'):
     return all_files
 
 
+def load_ood_data_kitti(files_path, itype='kitti'):
+    """Rescale & center-crop out-of-domain image to match nyu dims"""
+    fileend = '.png' if itype == 'kitti' else '.jpg'
+    assert len(glob.glob(files_path + '/*' + fileend)) == 654
+    all_files = np.zeros((654, 384, 1280, 3))
+    if itype == 'kitti':
+        crop_transform = ts.Compose([
+            ts.Resize((384, 1280))
+        ])
+    else:
+        crop_transform = ts.Compose([
+            ts.Resize((384, 1280))
+        ])
+    for i, path in enumerate(glob.glob(files_path + '/*' + fileend)):
+        img = Image.open(path)
+        all_files[i] = np.array(crop_transform(img))
+    return all_files
+
+
 def nyu_evaluate_ood_auc_scores(
     model, rgb_test, rgb_ood, unc_measures,
     transform_type='scaled', device='cuda:0'
