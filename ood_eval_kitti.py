@@ -11,7 +11,7 @@ if __name__ == '__main__':
         description='Evaluation of trained \
             Monocular Depth Estimation model on Nyu Depth v2'
     )
-    parser.add_argument('--zip_folder', default='data')
+    parser.add_argument('--indomain_folder', default='data')
     parser.add_argument('--ood_folder', default='data/kitti_subset')
     parser.add_argument(
         '--ood_type', default='kitti',
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         args.checkpoint, args.model_type, args.backbone, args.device
     )
 
-    rgb, _, _ = load_test_data(args.zip_folder)
+    rgb = load_ood_data(args.indomain_folder, itype='kitti')
     ood_rgb = load_ood_data(args.ood_folder, itype=args.ood_type)
 
     all_aucs = nyu_evaluate_ood_auc_scores(
