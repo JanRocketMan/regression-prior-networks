@@ -41,7 +41,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_end'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3
+        'gaussian': 2, 'nw_prior': 3, 'nw_end': 2
     }[args.model_type]
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             model, torch.optim.Adam, SummaryWriter, logdir,
             epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True}
         )
-    elif args.model_type != 'nw_prior':
+    elif args.model_type != 'nw_prior' and args.model_type != 'nw_end':
         print("Training with NLL objective")
         trainer_cls = KittiNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
@@ -121,7 +121,10 @@ if __name__ == '__main__':
             additional_params={'targets_transform': args.targets_transform}
         )
     elif args.teacher_checkpoints is not None:
-        print("Distilling with log prob")
+        if args.model_type == 'nw_end':
+            print("Distilling with pairwise kl divergence")
+        else:
+            print("Distilling with log prob")
         max_T = args.max_temperature
         trainer_cls = KittiDistillationTrainer(
             teacher_model, max_T,

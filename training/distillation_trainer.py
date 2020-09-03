@@ -1,5 +1,7 @@
 """Distill an ensemble into a single model"""
 import torch
+from torch.distributions import Normal
+from torch.distributions.kl import kl_divergence
 
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import SingleDistributionTrainer
@@ -77,17 +79,28 @@ class DistillationTrainer(SingleDistributionTrainer):
         smoothed_means, smoothed_vars = self.smooth_params(
             all_means, all_vars, T
         )
-        output_distr = self.smooth_predicted_params(output_distr, T)
 
         all_losses = []
-        for i in range(len(smoothed_means)):
-            all_losses.append(
-                -output_distr.log_prob(
-                    smoothed_means[i].unsqueeze(-1).to(self.device),
-                    1.0 / (
-                        smoothed_vars[i].unsqueeze(-1).to(self.device) +
-                        1e-5
-                    )
-                ).mean()
-            )
+        if isinstance(output_distr, Normal):
+            output_distr.scale *= temperature
+            for i in range(len(smoothed_means)):
+                all_losses.append(
+                    kl_divergence(
+                        output_distr,
+                        Normal(smoothed_means[i], smoothed_vars[i].pow(0.5))
+                    ).mean()
+                )
+        else:
+            output_distr = self.smooth_predicted_params(output_distr, T)
+
+            for i in range(len(smoothed_means)):
+                all_losses.append(
+                    -output_distr.log_prob(
+                        smoothed_means[i].unsqueeze(-1).to(self.device),
+                        1.0 / (
+                            smoothed_vars[i].unsqueeze(-1).to(self.device) +
+                            1e-5
+                        )
+                    ).mean()
+                )
         return sum(all_losses) / (T * len(all_losses))

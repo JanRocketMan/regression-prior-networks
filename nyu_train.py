@@ -37,7 +37,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3
+        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
     }[args.model_type]
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
@@ -86,9 +86,9 @@ if __name__ == '__main__':
         _load_densenet_dict(loaded_densenet, args.pretrained_path)
         model.encoder.original_model = loaded_densenet.features.cuda()
     model = torch.nn.DataParallel(model)
-    if args.model_type == 'gaussian':
+    if args.model_type == 'gaussian' or args.model_type == 'nw_end':
         model = ProbabilisticWrapper(Normal, model)
-    elif args.model_type == 'nw_prior' or args.model_type == 'nw_prior_rkl':
+    elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
         )
@@ -114,7 +114,10 @@ if __name__ == '__main__':
             additional_params={'targets_transform': args.targets_transform}
         )
     elif args.teacher_checkpoints is not None:
-        print("Distilling with log prob")
+        if args.model_type == 'nw_end':
+            print("Distilling with pairwise kl divergence")
+        else:
+            print("Distilling with log prob")
         max_T = args.max_temperature
         trainer_cls = NyuDistillationTrainer(
             teacher_model, max_T,
