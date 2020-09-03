@@ -87,7 +87,7 @@ if __name__ == '__main__':
         _load_densenet_dict(loaded_densenet, args.pretrained_path)
         model.encoder.original_model = loaded_densenet.features.cuda()
     model = torch.nn.DataParallel(model)
-    if args.model_type == 'gaussian':
+    if args.model_type == 'gaussian' or args.model_type == 'nw_end':
         model = ProbabilisticWrapper(Normal, model)
     elif args.model_type == 'nw_prior':
         model = ProbabilisticWrapper(

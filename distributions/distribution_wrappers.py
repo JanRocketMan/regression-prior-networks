@@ -15,7 +15,8 @@ def transform_to_distribution_params(params, distr_dim=1, eps=1e-6):
         return [mean, std]
     elif len(params) == 3:
         beta = Softplus()(params[2]) + eps
-        min_df = params[0].size(distr_dim) + 2  # !!!
+        min_df = 3
+        #min_df = params[0].size(distr_dim) + 2  # !!!
         kappa, nu = beta, beta + min_df
         return [mean.unsqueeze(-1), std.unsqueeze(-1), kappa, nu]
 
@@ -27,12 +28,17 @@ class ProbabilisticWrapper(Module):
         self.model = model
         self.distr_dim = distr_dim
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         out_params = self.model(x)
         assert len(out_params) in [2, 3]
-        predicted_params = transform_to_distribution_params(
-            out_params, self.distr_dim
-        )
+        if mask is not None:
+            predicted_params = transform_to_distribution_params(
+                [p[mask] for p in out_params], self.distr_dim
+            )
+        else:
+            predicted_params = transform_to_distribution_params(
+                out_params, self.distr_dim
+            )
         if not self.training:
             predicted_params = [param.cpu() for param in predicted_params]
         return self.distribution_cls(*predicted_params)
@@ -51,17 +57,23 @@ class GaussianEnsembleWrapper(Module):
         self.models = models
         self.distribution_cls = GaussianDiagonalMixture
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         agg = []
         for model in self.models:
             agg.append(model(x))
         assert len(agg[0]) == 2
-        all_predicted_params = [
-            transform_to_distribution_params(p) for p in agg
-        ]
+        if mask is not None:
+            all_predicted_params = [
+                transform_to_distribution_params([ps[mask] for ps in p])
+                for p in agg
+            ]
+        else:
+            all_predicted_params = [
+                transform_to_distribution_params(p) for p in agg
+            ]
         if not self.training:
             all_predicted_params = [
-                [p.cpu() for p in internal_params]
+                [p for p in internal_params]
                 for internal_params in all_predicted_params
             ]
         return self.distribution_cls(

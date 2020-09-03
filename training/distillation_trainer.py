@@ -82,7 +82,7 @@ class DistillationTrainer(SingleDistributionTrainer):
 
         all_losses = []
         if isinstance(output_distr, Normal):
-            output_distr.scale *= temperature
+            output_distr.scale *= T
             for i in range(len(smoothed_means)):
                 all_losses.append(
                     kl_divergence(
