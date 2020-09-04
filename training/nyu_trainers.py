@@ -1,5 +1,7 @@
 """Train a single model on NyuV2 dataset."""
 from datetime import timedelta
+
+import numpy as np
 import torchvision.utils as vutils
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
