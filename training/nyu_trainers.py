@@ -60,6 +60,7 @@ class NyuNLLDistributionTrainer(NLLSingleDistributionTrainer):
                     loss=self.loss_stats, eta=eta
                 )
             )
+        if current_step % 6336 == 0:
             # Record intermediate results
             self.show_examples_and_get_val_metrics(val_loader, current_step)
             self.model.train()
@@ -104,20 +105,30 @@ class NyuNLLDistributionTrainer(NLLSingleDistributionTrainer):
                 )
             ), current_step
         )
-
-        all_metrics = compute_rel_metrics(
-            sample_depth.cpu().numpy(), prediction.cpu().numpy()
-        )
+        
+        all_metrics_buffer = []
+        for i, batch in enumerate(val_loader):
+            sample_img, sample_depth = batch['image'].to(self.device), \
+                batch['depth'].to(self.device)
+            prediction = predict_targets(
+                self.model, sample_img.permute(0, 2, 3, 1).cpu().numpy(),
+                minDepth=1e-2, maxDepth=80.0,
+                transform_type=self.additional_params['targets_transform'],
+                device=self.device, clip=True, no_renorm=True
+            ).permute(0, 3, 1, 2)
+            all_metrics = compute_rel_metrics(
+                sample_depth.cpu().numpy(), prediction.cpu().numpy()
+            )
+            all_metrics_buffer.append(all_metrics)
         metric_names = ['delta_1', 'delta_2', 'delta_3', 'rel', 'rms', 'log10']
-
-        for mname, metric in zip(metric_names, all_metrics):
+        all_metrics_buffer = np.array(all_metrics_buffer).mean(axis=0)
+        for mname, metric in zip(metric_names, all_metrics_buffer):
             self.logger.add_scalar("Val/" + mname, metric, current_step)
 
-        if current_step % 6336 == 0:
-            print("Eval scores", end='\t')
-            for mname, metric in zip(metric_names, all_metrics):
-                print(mname, ': %.3f' % metric, end=' ')
-            print("")
+        print("Eval scores", end='\t', flush=True)
+        for mname, metric in zip(metric_names, all_metrics_buffer):
+            print(mname, ': %.3f' % metric, end=' ', flush=True)
+        print("")
 
 
 class NyuDistillationTrainer(DistillationTrainer, NyuNLLDistributionTrainer):
