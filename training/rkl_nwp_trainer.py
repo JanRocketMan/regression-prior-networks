@@ -3,6 +3,8 @@ Train a single model that is wrapped into NormalWishartPrior distribution.
 Uses RKL-based objective (see formula 11 in our paper).
 """
 from time import time
+import os
+
 import torch
 from torch.distributions.kl import kl_divergence
 
