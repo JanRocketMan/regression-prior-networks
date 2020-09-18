@@ -109,4 +109,4 @@ class GaussianEnsembleWrapper(Module):
 
     def make_dataparallel(self):
         for i, model in enumerate(self.models):
-            self.models[i] = nn.DataParallel(model)
+            self.models[i] = torch.nn.DataParallel(model)
