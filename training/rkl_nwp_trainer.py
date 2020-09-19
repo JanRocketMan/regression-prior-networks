@@ -63,6 +63,8 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
             start_time = time()
             self.model.train()
             for i, batch in enumerate(train_loader):
+                if epoch == 0 and i < self.warmup_steps:
+                    self.warmup_lr(i)
                 try:
                     batch_ood = next(ood_iterator)
                 except StopIteration:

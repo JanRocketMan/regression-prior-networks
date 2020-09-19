@@ -24,6 +24,7 @@ class SingleDistributionTrainer:
         """General single-model trainer"""
         self.model = model
         self.device = next(self.model.parameters()).device
+        self.warmup_steps = optimizer_args.pop("warmup_steps")
         self.optimizer = optimizer_cls(
             self.model.parameters(), **optimizer_args
         )
@@ -52,6 +53,12 @@ class SingleDistributionTrainer:
         nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
         self.optimizer.step()
 
+    def warmup_lr(self, step):
+        for g in self.optimizer.param_groups:
+            if not hasattr(self, 'default_lr'):
+                self.default_lr = g['lr']
+            g['lr'] = self.default_lr * float(step) / self.warmup_steps
+
     def train(self, train_loader, val_loader, save_path=None, load_path=None):
         if load_path is not None and os.path.isfile(load_path + '/traindata.ckpt'):
             init_epoch, global_step = self.load_current_state(load_path)
@@ -72,6 +79,8 @@ class SingleDistributionTrainer:
             start_time = time()
             self.model.train()
             for i, batch in enumerate(train_loader):
+                if epoch == 0 and i < self.warmup_steps:
+                    self.warmup_lr(i)
                 current_step = global_step + i
                 self.current_step = current_step
 

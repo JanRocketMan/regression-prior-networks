@@ -40,6 +40,7 @@ if __name__ == '__main__':
         'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end'
     ])
     parser.add_argument('--lr', default=1e-4)
+    parser.add_argument('--warmup_steps', default=1000)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
     parser.add_argument(
         '--log_dir', default="", type=str,
@@ -85,6 +86,10 @@ if __name__ == '__main__':
         loaded_densenet = densenet169(pretrained=False)
         _load_densenet_dict(loaded_densenet, args.pretrained_path)
         model.encoder.original_model = loaded_densenet.features.cuda()
+        if args.model_type == 'nw_prior_rkl':
+            # Adjust L and \beta initialization for RKL
+            model.decoder.conv3.weight[0].data.mul_(10)
+            model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
         model = ProbabilisticWrapper(Normal, model)
@@ -110,7 +115,9 @@ if __name__ == '__main__':
         print("Training with NLL objective")
         trainer_cls = NyuNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
-            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
+            epochs=args.epochs, optimizer_args={
+                'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
+            },
             additional_params={'targets_transform': args.targets_transform}
         )
     elif args.teacher_checkpoints is not None:
@@ -122,7 +129,7 @@ if __name__ == '__main__':
         trainer_cls = NyuDistillationTrainer(
             teacher_model, max_T,
             model, torch.optim.Adam, SummaryWriter, logdir,
-            args.epochs, {'lr': args.lr, 'amsgrad': True},
+            args.epochs, {'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps},
             additional_params={'targets_transform': args.targets_transform}
         )
     elif args.model_type == 'nw_prior_rkl':
@@ -133,7 +140,9 @@ if __name__ == '__main__':
         )
         trainer_cls = NyuRKLTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
-            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
+            epochs=args.epochs, optimizer_args={
+                'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
+            },
             additional_params={
                 'targets_transform': args.targets_transform,
                 'inv_real_beta': args.rkl_inv_beta,

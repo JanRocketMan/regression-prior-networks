@@ -126,15 +126,22 @@ def predict_targets(
 
 def predict_distributions(
     model, images, minDepth=10, maxDepth=1000,
-    transform_type='scaled', device='cuda:0', renorm=True, posterior=True
+    transform_type='scaled', device='cuda:0', renorm=True, posterior=True,
+    valid_masks=None
 ):
     """Returns list of predicted distributions for a given inputs"""
     dists_list = []
 
     for idx in range(len(images)):
         with torch.no_grad():
+            # Get mask to filter some outputs (if required)
+            if valid_masks is not None:
+                c_mask = valid_masks[idx].unsqueeze(0)
+            else:
+                c_mask = None
+
             # Compute results
-            pred_dist = model(images[idx].to(device).unsqueeze(0))
+            pred_dist = model(images[idx].to(device).unsqueeze(0), mask=c_mask)
 
             if posterior and isinstance(pred_dist, NormalWishartPrior):
                 # Infer posterior t-distribution from a prior prediction
