@@ -70,8 +70,7 @@ class NyuNLLDistributionTrainer(NLLSingleDistributionTrainer):
     def show_examples_and_get_val_metrics(self, val_loader, current_step):
         self.model.eval()
         batch = next(iter(val_loader))
-        sample_img, sample_depth = batch['image'].to(self.device), \
-            batch['depth'].to(self.device) / 1000.0
+        sample_img, sample_depth = self.preprocess_batch(batch)
         if current_step == 0:
             self.logger.add_image(
                 'Train.1.Image',
@@ -107,11 +106,10 @@ class NyuNLLDistributionTrainer(NLLSingleDistributionTrainer):
                 )
             ), current_step
         )
-        
+
         all_metrics_buffer = []
         for i, batch in enumerate(val_loader):
-            sample_img, sample_depth = batch['image'].to(self.device), \
-                batch['depth'].to(self.device)
+            sample_img, sample_depth = self.preprocess_batch(batch)
             prediction = predict_targets(
                 self.model, sample_img.permute(0, 2, 3, 1).cpu().numpy(),
                 minDepth=1e-2, maxDepth=80.0,
