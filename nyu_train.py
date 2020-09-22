@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_temperature', default=10.0, type=float)
     parser.add_argument('--rkl_inv_beta', default=1e-2, type=float)
     parser.add_argument('--rkl_ood_coeff', default=1.0, type=float)
-    parser.add_argument('--rkl_warmup_steps', default=30000)
+    parser.add_argument('--rkl_warmup_steps', default=30000, type=int)
     parser.add_argument('--rkl_prior_beta', default=1e-2, type=float)
     args = parser.parse_args()
 
