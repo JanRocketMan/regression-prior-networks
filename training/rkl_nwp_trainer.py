@@ -31,6 +31,14 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         self.loss_params["inv_real_beta"] = additional_params["inv_real_beta"]
         self.loss_params["ood_coeff"] = additional_params["ood_coeff"]
         self.loss_params["prior_beta"] = additional_params["prior_beta"]
+        self.loss_params["ood_coeff_warmup"] = additional_params["ood_coeff_warmup"]
+
+    def warmup_ood_coeff(self, step):
+        maxstep = self.loss_params["ood_coeff_warmup"]
+        if maxstep > 0 and step < maxstep:
+            self.ood_coeff = self.loss_params["ood_coeff"] * (step / maxstep)
+        else:
+            self.ood_coeff = self.loss_params["ood_coeff"]
 
     def train(
         self, train_loader, val_loader,
@@ -63,8 +71,11 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
             start_time = time()
             self.model.train()
             for i, batch in enumerate(train_loader):
+                # Warmup learning rate
                 if epoch == 0 and i < self.warmup_steps:
                     self.warmup_lr(i)
+                # Warmup ood coefficient
+                self.warmup_ood_coeff(i + epoch * len(train_loader))
                 try:
                     batch_ood = next(ood_iterator)
                 except StopIteration:
@@ -166,7 +177,7 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
                 self.current_step
             )
 
-        return id_loss + self.loss_params["ood_coeff"] * ood_loss
+        return id_loss + self.ood_coeff * ood_loss
 
     def loss_fn(self, predicted_distr, prior_distr, targets=None):
         if targets is not None:
