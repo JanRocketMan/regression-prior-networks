@@ -49,8 +49,10 @@ class NWPriorRKLTrainer(SingleDistributionTrainer):
         self.estimate_targets_avg_mean_var(train_loader)  # Required for Prior
 
         if load_path is not None and os.path.isfile(load_path + '/traindata.ckpt'):
+            print("Loading model from", load_path)
             init_epoch, global_step = self.load_current_state(load_path)
         else:
+            print("No model found at", load_path, "starting from beginning")
             init_epoch, global_step = 0, 0
             self.logger = self.logger_cls(logdir=self.logger_logdir)
 
