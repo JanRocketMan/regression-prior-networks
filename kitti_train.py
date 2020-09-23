@@ -44,6 +44,7 @@ if __name__ == '__main__':
         'gaussian', 'nw_prior', 'l1-ssim', 'nw_end'
     ])
     parser.add_argument('--lr', default=1e-4)
+    parser.add_argument('--warmup_steps', default=1000)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
     parser.add_argument(
         '--log_dir', default="", type=str,
@@ -111,13 +112,17 @@ if __name__ == '__main__':
         print("Training with original loss")
         trainer_cls = KittiL1SSIMTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
-            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True}
+            epochs=args.epochs, optimizer_args={
+                'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
+            }
         )
     elif args.model_type != 'nw_prior' and args.model_type != 'nw_end':
         print("Training with NLL objective")
         trainer_cls = KittiNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
-            epochs=args.epochs, optimizer_args={'lr': args.lr, 'amsgrad': True},
+            epochs=args.epochs, optimizer_args={
+                'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
+            },
             additional_params={'targets_transform': args.targets_transform}
         )
     elif args.teacher_checkpoints is not None:
@@ -129,7 +134,7 @@ if __name__ == '__main__':
         trainer_cls = KittiDistillationTrainer(
             teacher_model, max_T,
             model, torch.optim.Adam, SummaryWriter, logdir,
-            args.epochs, {'lr': args.lr, 'amsgrad': True},
+            args.epochs, {'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps},
             additional_params={'targets_transform': args.targets_transform}
         )
     else:
