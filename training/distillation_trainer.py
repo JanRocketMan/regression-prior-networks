@@ -7,6 +7,13 @@ from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import SingleDistributionTrainer
 
 
+def smoothed_kl_normal_normal(p, q, temperature):
+    # Adjust KL divergence by multiplying MSE term by 2T^2
+    var_ratio = (p.scale / q.scale).pow(2)
+    t1 = ((p.loc - q.loc) / q.scale).pow(2)
+    return 0.5 * (var_ratio + 2 * (temperature ** 2) * t1 - 1 - var_ratio.log())
+
+
 class DistillationTrainer(SingleDistributionTrainer):
     def __init__(
         self, teacher_model: GaussianEnsembleWrapper, T, *args, **kwargs
@@ -48,17 +55,7 @@ class DistillationTrainer(SingleDistributionTrainer):
         return T
 
     def smooth_params(self, all_means, all_vars, temperature):
-        avg_mean = sum(all_means) / len(all_means)
-        avg_var = sum(all_vars) / len(all_vars)
-        new_means = [
-            ((temperature - 1) * avg_mean + 2 * cmean) / (temperature + 1)
-            for cmean in all_means
-        ]
-        new_vars = [
-            ((temperature - 1) * avg_var + 2 * cvar) / (temperature + 1)
-            for cvar in all_vars
-        ]
-        return new_means, new_vars
+        return all_means, [var * (temperature ** 2) for var in all_vars]
 
     def smooth_predicted_params(self, output_distr, temperature):
         min_df = output_distr.dimensionality + 2  # !
@@ -85,9 +82,10 @@ class DistillationTrainer(SingleDistributionTrainer):
             output_distr.scale *= T
             for i in range(len(smoothed_means)):
                 all_losses.append(
-                    kl_divergence(
+                    smoothed_kl_normal_normal(
                         output_distr,
-                        Normal(smoothed_means[i], smoothed_vars[i].pow(0.5))
+                        Normal(smoothed_means[i], smoothed_vars[i].pow(0.5)),
+                        T
                     ).mean()
                 )
         else:
