@@ -119,8 +119,8 @@ def main():
     logger.info(get_model_summary(model, dump_input))
 
 
-    
-    model = torch.nn.DataParallel(model, device_ids=cfg.GPUS).cuda()
+    model.final_layer.weight[0].data.mul_(10)
+    model = torch.nn.DataParallel(model, device_ids=cfg.GPUS).cuda() # (bs x joints x imsize1 x imsize2) x 2
     model = ProbabilisticWrapper(Normal, model).cuda()
 
 
@@ -201,9 +201,9 @@ def main():
         last_epoch=last_epoch
     )
 
+
     for epoch in range(begin_epoch, cfg.TRAIN.END_EPOCH):
         lr_scheduler.step()
-
         # train for one epoch
         train(cfg, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)

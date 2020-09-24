@@ -11,6 +11,10 @@ def transform_to_distribution_params(params, distr_dim=1, eps=1e-6):
     Normal or Normal-Wishart distributions"""
     mean = params[0]
     std = Softplus()(params[1]) + eps
+    mean_std = std.mean(dim=(2,3), keepdim=True)
+    std = mean_std
+    #print("STD mean", std.mean())
+    #std = torch.ones_like(params[0], requires_grad=False).cuda()
     if len(params) == 2:
         return [mean, std]
     elif len(params) == 3:

@@ -14,6 +14,7 @@ import os
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 from hrnet.lib.core.evaluate import accuracy
 from hrnet.lib.core.inference import get_final_preds
@@ -23,6 +24,11 @@ from hrnet.lib.utils.vis import save_debug_images
 
 logger = logging.getLogger(__name__)
 
+def warmup_lr(optimizer, step, default_lr, warmup_steps):
+    if step >= warmup_steps:
+        return
+    for g in optimizer.param_groups:
+        g['lr'] = default_lr * float(step) / warmup_steps
 
 def train(config, train_loader, model, criterion, optimizer, epoch,
           output_dir, tb_log_dir, writer_dict):
@@ -35,13 +41,17 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
+
+    step = 0
+    accumulated_std = 0
     for i, (input, target, target_weight, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-
+        step += 1
+        warmup_lr(optimizer, step, config.TRAIN.LR, config.TRAIN.WARMUP_STEPS)
         # compute output
         outputs = model(input)
-
+        accumulated_std += outputs.stddev.mean().detach().cpu().numpy()
         target = target.cuda(non_blocking=True)
         target_weight = target_weight.cuda(non_blocking=True)
 
@@ -51,13 +61,14 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
                 loss += criterion(output, target, target_weight)
         else:
             output = outputs
-            loss = criterion(output, target, target_weight)
+            loss = criterion(output, target, target_weight, step)
 
         # loss = criterion(output, target, target_weight)
 
         # compute gradient and do update step
         optimizer.zero_grad()
         loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), 0.5)
         optimizer.step()
 
         # measure accuracy and record loss
@@ -93,6 +104,8 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
             save_debug_images(config, input, meta, target, pred*4, output,
                               prefix)
+    
+    print("MEAN STD:", str(accumulated_std/step))
 
 
 def validate(config, val_loader, val_dataset, model, criterion, output_dir,
