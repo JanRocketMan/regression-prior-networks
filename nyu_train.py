@@ -129,6 +129,8 @@ if __name__ == '__main__':
     elif args.teacher_checkpoints is not None:
         if args.model_type == 'nw_end':
             print("Distilling with pairwise kl divergence")
+        elif args.model_type == 'hydra':
+            print("Distilling into multiple heads simultaneously")
         else:
             print("Distilling with log prob")
         max_T = args.max_temperature
