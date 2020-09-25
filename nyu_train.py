@@ -71,7 +71,6 @@ if __name__ == '__main__':
             raise ValueError(
                 "Incorrect path to folder:" + path
             )
-
     # Load model
     channels = {
         'l1-ssim': 1,
