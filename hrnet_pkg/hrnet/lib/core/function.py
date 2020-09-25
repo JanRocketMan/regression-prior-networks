@@ -74,7 +74,18 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # measure accuracy and record loss
         losses.update(loss.item(), input.size(0))
         if hasattr(model, 'distribution_cls'):
-            output = output.mean
+            output = output.mean # bs x joints x 2
+            new_output = torch.zeros_like(target, requires_grad=False)
+            with torch.no_grad():
+                rows, cols = output.split(1, dim=2) # ((bs, joints, 1) x 2)
+                for k in range(target.shape[0]):
+                    for j in range(target.shape[1]):
+                        new_output[k, j, rows[k,j].round().long(), cols[k,j].round().long()] = 1.
+                output = new_output
+                assert output[0][0][rows[0][0][0].round().long()][cols[0][0][0].round().long()] == 1.
+                assert torch.sum(output[0][0]) - 1. < 1e-7
+                #print(torch.sum(output[0][0]))
+
         _, avg_acc, cnt, pred = accuracy(output.detach().cpu().numpy(),
                                          target.detach().cpu().numpy())
         acc.update(avg_acc, cnt)
@@ -139,6 +150,13 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
             
             if hasattr(model, 'distribution_cls'):
                 output = output.mean
+                new_output = torch.zeros_like(target, requires_grad=False)
+                with torch.no_grad():
+                    rows, cols = output.split(1, dim=2) # ((bs, joints, 1) x 2)
+                    for k in range(target.shape[0]):
+                        for j in range(target.shape[1]):
+                            new_output[k, j, rows[k,j].round().long(), cols[k,j].round().long()] = 1.
+                    output = new_output
 
             if config.TEST.FLIP_TEST:
                 input_flipped = input.flip(3)
@@ -151,6 +169,13 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
 
                 if hasattr(model, 'distribution_cls'):
                     output_flipped = output_flipped.mean
+                    new_output = torch.zeros_like(target, requires_grad=False)
+                    with torch.no_grad():
+                        rows, cols = output_flipped.split(1, dim=2) # ((bs, joints, 1) x 2)
+                        for k in range(target.shape[0]):
+                            for j in range(target.shape[1]):
+                                new_output[k, j, rows[k,j].round().long(), cols[k,j].round().long()] = 1.
+                        output_flipped = new_output
 
                 output_flipped = flip_back(output_flipped.cpu().numpy(),
                                            val_dataset.flip_pairs)

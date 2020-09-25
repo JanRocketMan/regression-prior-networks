@@ -24,6 +24,9 @@ def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), input.size(1), -1)
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -322,13 +325,15 @@ class PoseHighResolutionNet(nn.Module):
 
         self.num_splits = cfg['MODEL']['NUM_SPLITS'] 
         self.num_joints = int(cfg['MODEL']['NUM_JOINTS'])
-        self.final_layer = nn.Conv2d(
+        self.final_conv_layer = nn.Conv2d(
             in_channels=pre_stage_channels[0],
-            out_channels=cfg['MODEL']['NUM_JOINTS'] * self.num_splits,
+            out_channels=cfg['MODEL']['NUM_JOINTS'], # * self.num_splits,
             kernel_size=extra['FINAL_CONV_KERNEL'],
             stride=1,
             padding=1 if extra['FINAL_CONV_KERNEL'] == 3 else 0
         )
+        self.flatten = Flatten()
+        self.final_layer = nn.Linear(4096, 2 * self.num_splits)
         self.pretrained_layers = extra['PRETRAINED_LAYERS']
 
     def _make_transition_layer(
@@ -456,13 +461,17 @@ class PoseHighResolutionNet(nn.Module):
             else:
                 x_list.append(y_list[i])
         y_list = self.stage4(x_list)
-
-        x = self.final_layer(y_list[0])
+        x = self.final_conv_layer(y_list[0])
+        x = self.flatten(x)
+        x = self.final_layer(x)
         if self.num_splits == 1:
             return x
         elif self.num_splits > 1:
-            x = torch.split(x, [self.num_joints]*self.num_splits, dim=1)
+            x = torch.split(x, [2] * 2, dim=2)
             return x
+        #elif self.num_splits > 1:
+        #    x = torch.split(x, [self.num_joints]*self.num_splits, dim=1)
+        #    return x
         else:
             raise ValueError()
 

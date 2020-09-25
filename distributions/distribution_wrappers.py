@@ -1,5 +1,5 @@
 import torch
-from torch.nn import Softplus, Module
+from torch.nn import Softplus, Module, Sigmoid
 
 from torch.distributions.normal import Normal
 from .mixture_gaussian import GaussianDiagonalMixture
@@ -9,10 +9,10 @@ def transform_to_distribution_params(params, distr_dim=1, eps=1e-6):
     """Apply nonlinearities to unconstrained model outputs so
     they can be represented as parameters of either
     Normal or Normal-Wishart distributions"""
-    mean = params[0]
+    mean = Sigmoid()(params[0])*63
     std = Softplus()(params[1]) + eps
-    mean_std = std.mean(dim=(2,3), keepdim=True)
-    std = mean_std
+    #mean_std = std.mean(dim=(2,3), keepdim=True)
+    #std = mean_std
     #print("STD mean", std.mean())
     #std = torch.ones_like(params[0], requires_grad=False).cuda()
     if len(params) == 2:
