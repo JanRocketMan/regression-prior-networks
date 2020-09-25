@@ -3,6 +3,7 @@ import torch
 from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence
 
+from distributions import GaussianDiagonalMixture
 from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import SingleDistributionTrainer
 
@@ -84,6 +85,18 @@ class DistillationTrainer(SingleDistributionTrainer):
                 all_losses.append(
                     smoothed_kl_normal_normal(
                         output_distr,
+                        Normal(smoothed_means[i], smoothed_vars[i].pow(0.5)),
+                        T
+                    ).mean()
+                )
+        elif isinstance(output_distr, GaussianDiagonalMixture):
+            assert len(smoothed_means) == len(output_distr.distributions)
+            for dist in output_distr.distributions:
+                dist.scale *= T
+            for i in range(len(smoothed_means)):
+                all_losses.append(
+                    smoothed_kl_normal_normal(
+                        output_distr.distributions[i],
                         Normal(smoothed_means[i], smoothed_vars[i].pow(0.5)),
                         T
                     ).mean()

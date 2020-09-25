@@ -6,7 +6,7 @@ from torchvision.models import densenet169
 from tensorboardX import SummaryWriter
 from torch.distributions import Normal
 
-from distributions import NormalWishartPrior
+from distributions import NormalWishartPrior, GaussianDiagonalMixture
 
 from utils.data_loading import getTrainingEvalData
 from distributions.distribution_wrappers import ProbabilisticWrapper
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--warmup_steps', default=1000)
@@ -75,7 +75,8 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
+        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2,
+        'hydra': len(args.teacher_checkpoints) * 2
     }[args.model_type]
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
@@ -97,6 +98,10 @@ if __name__ == '__main__':
     elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
+        )
+    elif args.model_type == 'hydra':
+        model = ProbabilisticWrapper(
+            GaussianDiagonalMixture, model
         )
     print("Model created")
 

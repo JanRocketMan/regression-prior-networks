@@ -9,6 +9,13 @@ def transform_to_distribution_params(params, distr_dim=1, eps=1e-6):
     """Apply nonlinearities to unconstrained model outputs so
     they can be represented as parameters of either
     Normal or Normal-Wishart distributions"""
+    if len(params) > 3:
+        all_means, all_stds = [], []
+        for i in range(len(params) // 2):
+            all_means.append(params[i * 2])
+            all_stds.append(Softplus()(params[i * 2 + 1]) + eps)
+        return torch.cat(all_means, dim=1), torch.cat(all_stds, dim=1)
+
     mean = params[0]
     std = Softplus()(params[1]) + eps
     if len(params) == 2:
@@ -30,7 +37,9 @@ class ProbabilisticWrapper(Module):
 
     def forward(self, x, mask=None):
         out_params = self.model(x)
-        assert len(out_params) in [2, 3]
+        assert (len(out_params) in [2, 3]) or isinstance(
+            self.distribution_cls, GaussianDiagonalMixture
+        )
         if mask is not None:
             predicted_params = transform_to_distribution_params(
                 [p[mask] for p in out_params], self.distr_dim
