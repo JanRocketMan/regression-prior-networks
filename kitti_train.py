@@ -14,7 +14,7 @@ from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
 from training.kitti_trainers import KittiNLLDistributionTrainer
 from training.kitti_trainers import KittiDistillationTrainer
-from training.kitti_trainers import KittiL1SSIMTrainer
+from training.kitti_trainers import KittiL1SSIMTrainer, KittiRKLTrainer
 from utils.model_utils import load_unet_model_from_checkpoint
 from utils.model_utils import _load_densenet_dict
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim', 'nw_end', 'hydra'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--warmup_steps', default=1000)
@@ -75,9 +75,10 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3, 'nw_end': 2,
-        'hydra': len(args.teacher_checkpoints) * 2
+        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
     }[args.model_type]
+    if args.model_type == 'hydra':
+        channels = len(args.teacher_checkpoints) * 2
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
     else:
@@ -88,10 +89,14 @@ if __name__ == '__main__':
         loaded_densenet = densenet169(pretrained=False)
         _load_densenet_dict(loaded_densenet, args.pretrained_path)
         model.encoder.original_model = loaded_densenet.features.cuda()
+        if args.model_type == 'nw_prior_rkl':
+            # Adjust L and \beta initialization for RKL
+            model.decoder.conv3.weight[0].data.mul_(10)
+            model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
         model = ProbabilisticWrapper(Normal, model)
-    elif args.model_type == 'nw_prior':
+    elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
         )
@@ -145,7 +150,25 @@ if __name__ == '__main__':
             additional_params={'targets_transform': args.targets_transform}
         )
     else:
-        raise Exception("RKL training for Nyu currently not supported")
+        print("Performing RKL training with custom OOD data")
+        oodloader = "TODO"
+        #ood_loader, _ = getTrainingEvalDataKITTI(
+        #    path=args.zip_folder + '/nyu_ood_church.zip', batch_size=args.bs,
+        #    sanity_check=args.overfit, is_ood=True
+        #)
+        trainer_cls = KittiRKLTrainer(
+            model, torch.optim.Adam, SummaryWriter, logdir,
+            epochs=args.epochs, optimizer_args={
+                'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
+            },
+            additional_params={
+                'targets_transform': args.targets_transform,
+                'inv_real_beta': args.rkl_inv_beta,
+                'ood_coeff': args.rkl_ood_coeff,
+                'prior_beta': args.rkl_prior_beta,
+                "ood_coeff_warmup": args.rkl_warmup_steps
+            }
+        )
     print("Trainer created")
 
     # Load data

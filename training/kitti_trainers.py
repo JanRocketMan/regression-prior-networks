@@ -8,6 +8,7 @@ from distributions.distribution_wrappers import GaussianEnsembleWrapper
 from training.distribution_trainer import NLLSingleDistributionTrainer, SingleDistributionTrainer
 from training.distillation_trainer import DistillationTrainer
 from training.l1ssim_trainer import L1SSIMTrainer
+from training.rkl_nwp_trainer import NWPriorRKLTrainer
 
 from evaluation.depth_testing import compute_rel_metrics
 from utils.depth_utils import predict_targets
@@ -163,6 +164,28 @@ class KittiDistillationTrainer(
 class KittiL1SSIMTrainer(L1SSIMTrainer, KittiNLLDistributionTrainer):
     def preprocess_batch(self, batch):
         return KittiNLLDistributionTrainer.preprocess_batch(self, batch)
+
+    def logging_step(
+        self, val_loader, current_step,
+        current_epoch, step_idx, steps_per_epoch
+    ):
+        return KittiNLLDistributionTrainer.logging_step(
+            self,
+            val_loader, current_step, current_epoch, step_idx, steps_per_epoch
+        )
+
+    def show_examples_and_get_val_metrics(self, val_loader, current_step):
+        return KittiNLLDistributionTrainer.show_examples_and_get_val_metrics(
+            self, val_loader, current_step
+        )
+
+
+class KittiRKLTrainer(NWPriorRKLTrainer, KittiNLLDistributionTrainer):
+    def preprocess_batch(self, batch):
+        return KittiNLLDistributionTrainer.preprocess_batch(self, batch)
+
+    def preprocess_ood_batch(self, batch):
+        return batch['image'].to(self.device)
 
     def logging_step(
         self, val_loader, current_step,

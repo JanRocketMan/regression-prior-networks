@@ -74,9 +74,10 @@ if __name__ == '__main__':
     # Load model
     channels = {
         'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2,
-        'hydra': len(args.teacher_checkpoints) * 2
+        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
     }[args.model_type]
+    if args.model_type == 'hydra':
+        channels = len(args.teacher_checkpoints) * 2
     if args.pretrained_path is None:
         model = UNetModel(args.backbone, out_channels=channels).cuda()
     else:
@@ -158,8 +159,6 @@ if __name__ == '__main__':
                 "ood_coeff_warmup": args.rkl_warmup_steps
             }
         )
-    else:
-        raise Exception("RKL training for Nyu currently not supported")
     print("Trainer created")
 
     # Load data
