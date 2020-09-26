@@ -14,23 +14,24 @@ def standartize_array(arr, arr_min, arr_max):
 
 def show_model_examples(
     model, rgb_images, depth, indices, unc_measures,
-    transform_type='scaled', device='cuda:0', max_limits=None
+    transform_type='scaled', device='cuda:0', max_limits=None, trainmodel='nyu'
 ):
     inputs = torch.FloatTensor(rgb_images[indices] / 255).permute(0, 3, 1, 2)
 
     pred_dists = predict_distributions(
         model, inputs,
-        transform_type=transform_type, device=device, posterior=False
+        transform_type=transform_type, device=device, posterior=False,
+        renorm=(trainmodel == 'nyu')
     )
 
     # Rescale & downsample targets
     if depth is not None:
         targets = torch.FloatTensor(depth[indices])
-        targets = DepthNorm(targets, transform_type=transform_type)
+        if trainmodel == 'nyu':
+            targets = DepthNorm(targets, transform_type=transform_type)
         targets = torch.nn.functional.interpolate(
             targets.unsqueeze(1), scale_factor=0.5
         )
-
     # Compute differences to ground truth & measures of uncertainty
     # If targets not available, show predictions only
     if depth is not None:

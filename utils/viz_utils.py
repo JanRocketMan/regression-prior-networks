@@ -11,7 +11,7 @@ from torchvision.transforms import ToTensor, Resize, ToPILImage
 from utils.turbo_cmap import turbo_cm
 
 
-def get_example_figure(ensemble_data, endd_data, hist_data):
+def get_example_figure(ensemble_data, endd_data, hist_data, ispred=False):
     fig = plt.figure(figsize=(17.77, 10))
     plt.rc('font', size=30)
     gs = gridspec.GridSpec(
@@ -23,7 +23,8 @@ def get_example_figure(ensemble_data, endd_data, hist_data):
             ax = fig.add_subplot(gs[i, k])
             if i == 0:
                 title_text = {
-                    0: "Input", 1: "Error", 2: "Total", 3: "Knowledge"
+                    0: "Input", 1: "Error" if ispred else "Prediction",
+                    2: "Total", 3: "Knowledge"
                 }
                 ax.set_title(title_text[k])
             if k == 0:

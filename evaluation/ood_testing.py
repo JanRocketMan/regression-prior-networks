@@ -32,7 +32,7 @@ def load_ood_data(files_path, itype='kitti'):
 
 def load_ood_data_kitti(files_path, itype='kitti'):
     """Rescale & center-crop out-of-domain image to match nyu dims"""
-    fileend = '.png' if itype == 'kitti' else '.jpg'
+    fileend = '.png' if itype == 'kitti' or itype == 'nyu' else '.jpg'
     assert len(glob.glob(files_path + '/*' + fileend)) == 654
     all_files = np.zeros((654, 384, 1280, 3))
     if itype == 'kitti':

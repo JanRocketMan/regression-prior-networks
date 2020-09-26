@@ -9,8 +9,8 @@ import torch
 from torchvision.transforms import ToTensor, Resize, ToPILImage
 
 from evaluation.show_examples import show_model_examples
-from utils.nyuv2_loading import load_test_data
-from evaluation.ood_testing import load_ood_data
+from utils.data_loading import load_test_data, getTrainingEvalDataKITTI
+from evaluation.ood_testing import load_ood_data, load_ood_data_kitti
 from utils.model_utils import load_unet_model_from_checkpoint
 from utils.viz_utils import get_example_figure, get_tensor_with_histograms
 
@@ -57,14 +57,34 @@ if __name__ == '__main__':
         nargs='+', help='Uncertainty measures to visualize'
     )
     parser.add_argument('--device', default='cuda:0')
+    parser.add_argument('--trainmodel', default='nyu', choices=['nyu', 'kitti'])
+    parser.add_argument('--kitti_csv_test', default='none', type=str)
     args = parser.parse_args()
 
     all_indices = [int(idx) for idx in args.indices]
-    if args.data_type == 'nyu':
+    if args.data_type == 'nyu' and args.trainmodel == 'nyu':
         rgb, depth, crop = load_test_data(args.data_path)
-    else:
+    elif args.trainmodel == 'nyu':
         rgb = load_ood_data(args.data_path, args.data_type)
         depth, crop = None, None
+    elif args.data_type == 'kitti':
+        _, test_loader = getTrainingEvalDataKITTI(
+            path_to_kitti=args.data_path,
+            path_to_csv_train=args.kitti_csv_test,
+            path_to_csv_val=args.kitti_csv_test,
+            batch_size=args.bs,
+            resize_depth=False
+        )
+        rgb, depth = [], []
+        for data in test_loader:
+            rgb.append(data['image'])
+            depth.append(data['depth'])
+        rgb, depth = torch.cat(rgb), torch.cat(depth)
+        rgb = rgb.permute((0, 2, 3, 1)).numpy() * 255.0
+        depth = depth.squeeze().numpy()
+    else:
+        rgb = load_ood_data_kitti(args.data_path, itype=args.data_type)
+        depth = None
 
     max_limits = None
     all_results = {}
@@ -80,7 +100,8 @@ if __name__ == '__main__':
         if model_type == 'gaussian':
             results = show_model_examples(
                 model, rgb, depth, all_indices,
-                ['variance'], args.targets_transform, args.device
+                ['variance'], args.targets_transform, args.device,
+                trainmodel=args.trainmodel
             )
             max_limits = results[-1]
         else:
@@ -108,7 +129,8 @@ if __name__ == '__main__':
             for measure in args.measures
         ] for model_n in ['gaussian-ensemble', 'nw_prior']]
         figure = get_example_figure(
-            ensm_data, endd_data, all_hists[i*4:i*4+4]
+            ensm_data, endd_data, all_hists[i*4:i*4+4],
+            ispred=(args.trainmodel == args.data_type)
         )
         figure.savefig(
             'temp_plots/example_' + args.data_type + '_' + str(idx) + '.png',

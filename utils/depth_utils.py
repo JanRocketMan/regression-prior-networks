@@ -65,7 +65,7 @@ def renorm_param(
         transform_type=transform_type
     ) / maxDepth
     if clip:
-        renormed_param = np.clip(renormed_param, minDepth / maxDepth, 1.0)
+        renormed_param = torch.clamp(renormed_param, minDepth / maxDepth, 1.0)
     return renormed_param
 
 
