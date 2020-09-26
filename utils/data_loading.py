@@ -128,15 +128,15 @@ def loadZipToMem(zip_file, sanity_check=False, is_ood=False):
     from zipfile import ZipFile
     input_zip = ZipFile(zip_file)
     data = {name: input_zip.read(name) for name in input_zip.namelist()}
-    l_beg = 'ood_data' if is_ood else 'data'
+    l_beg = input_zip.filelist[0].filename
     nyu2_train = list(
         (row.split(',') for row in (
-            data[l_beg + '/nyu2_train.csv']
+            data[l_beg + 'nyu2_train.csv']
         ).decode("utf-8").split('\n') if len(row) > 0)
     )
     nyu2_val = list(
         (row.split(',') for row in (
-            data[l_beg + '/nyu2_test.csv']
+            data[l_beg + 'nyu2_test.csv']
         ).decode("utf-8").split('\n') if len(row) > 0)
     )
     from sklearn.utils import shuffle
@@ -151,18 +151,24 @@ def loadZipToMem(zip_file, sanity_check=False, is_ood=False):
 
 
 class depthDatasetMemory(Dataset):
-    def __init__(self, data, nyu2_train, transform=None, is_ood=False, is_val=False):
+    def __init__(self, data, nyu2_train, transform=None, is_ood=False, is_val=False, indata='nyu'):
         self.data, self.nyu_dataset = data, nyu2_train
         self.transform = transform
         self.is_ood = is_ood
         self.crop_seed = 42 if is_val else None
+        self.target_shapes = (640, 480) if indata == 'nyu' else (1280, 384)
 
     def __getitem__(self, idx):
         sample = self.nyu_dataset[idx]
         if self.is_ood:
             image = Image.open(BytesIO(self.data[sample[0]]))
-            resized_img = random_crop_and_resize(image, (630, 470), self.crop_seed)
-            sample = {'image': ImageOps.expand(resized_img, border=5, fill='white')}
+            if self.target_shapes[0] == 640:
+                resized_img = random_crop_and_resize(image, (630, 470), self.crop_seed)
+                #resized_img = image.resize((630, 470))
+                sample = {'image': ImageOps.expand(resized_img, border=5, fill='white')}
+            else:
+                resized_img = random_crop_and_resize(image, self.target_shapes, self.crop_seed)
+                sample = {'image': resized_img}
         else:
             image = Image.open(BytesIO(self.data[sample[0]]))
             depth = Image.open(BytesIO(self.data[sample[1]]))
@@ -314,16 +320,16 @@ def getDefaultTrainTransformKitti():
     ])
 
 
-def getTrainingEvalData(path, batch_size, sanity_check=False, is_ood=False):
+def getTrainingEvalData(path, batch_size, sanity_check=False, is_ood=False, indata='nyu'):
     data, nyu2_train, nyu2_val = loadZipToMem(
         path, sanity_check=sanity_check, is_ood=is_ood
     )
 
     transformed_training = depthDatasetMemory(
-        data, nyu2_train, transform=getDefaultTrainTransform(), is_ood=is_ood
+        data, nyu2_train, transform=getDefaultTrainTransform(), is_ood=is_ood, indata=indata
     )
     transformed_val = depthDatasetMemory(
-        data, nyu2_val, transform=getNoTransform(is_val=True), is_ood=is_ood,
+        data, nyu2_val, transform=getNoTransform(is_val=True), is_ood=is_ood, indata=indata,
         is_val=True
     )
 

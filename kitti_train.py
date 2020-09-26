@@ -8,7 +8,7 @@ from torch.distributions import Normal
 
 from distributions import NormalWishartPrior, GaussianDiagonalMixture
 
-from utils.data_loading import getTrainingEvalDataKITTI
+from utils.data_loading import getTrainingEvalDataKITTI, getTrainingEvalData
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from models.unet_model import UNetModel
@@ -31,6 +31,10 @@ if __name__ == '__main__':
     parser.add_argument('--path_to_csv_train', type=str)
     parser.add_argument('--path_to_csv_val', type=str)
     parser.add_argument(
+        '--ood_zip_path', default='none', type=str,
+        help="Path to zip containing ood data (for RKL training only)"
+    )
+    parser.add_argument(
         '--checkpoint', required=True, type=str,
         help="Name of the folder to save model/trainer states to"
     )
@@ -44,7 +48,7 @@ if __name__ == '__main__':
         'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
     ])
     parser.add_argument('--lr', default=1e-4)
-    parser.add_argument('--warmup_steps', default=1000)
+    parser.add_argument('--warmup_steps', default=1000, type=int)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
     parser.add_argument(
         '--log_dir', default="", type=str,
@@ -64,6 +68,10 @@ if __name__ == '__main__':
         help="If true, uses a tiny subset of the whole train"
     )
     parser.add_argument('--max_temperature', default=10.0, type=float)
+    parser.add_argument('--rkl_inv_beta', default=1e-2, type=float)
+    parser.add_argument('--rkl_ood_coeff', default=1.0, type=float)
+    parser.add_argument('--rkl_warmup_steps', default=30000, type=int)
+    parser.add_argument('--rkl_prior_beta', default=1e-2, type=float)
     args = parser.parse_args()
 
     for path in [args.checkpoint, args.path_to_kitti]:
@@ -126,7 +134,7 @@ if __name__ == '__main__':
                 'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
             }
         )
-    elif args.model_type != 'nw_prior' and args.model_type != 'nw_end':
+    elif args.model_type == 'gaussian':
         print("Training with NLL objective")
         trainer_cls = KittiNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
@@ -151,11 +159,10 @@ if __name__ == '__main__':
         )
     else:
         print("Performing RKL training with custom OOD data")
-        oodloader = "TODO"
-        #ood_loader, _ = getTrainingEvalDataKITTI(
-        #    path=args.zip_folder + '/nyu_ood_church.zip', batch_size=args.bs,
-        #    sanity_check=args.overfit, is_ood=True
-        #)
+        ood_loader, _ = getTrainingEvalData(
+            path=args.ood_zip_path, batch_size=args.bs,
+            sanity_check=args.overfit, is_ood=True, indata='kitti'
+        )
         trainer_cls = KittiRKLTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
             epochs=args.epochs, optimizer_args={
@@ -181,6 +188,12 @@ if __name__ == '__main__':
     print("Data loaded")
 
     print("Training...")
-    trainer_cls.train(
-        train_loader, val_loader, args.checkpoint, args.state_dict
-    )
+    if args.model_type == 'nw_prior_rkl':
+        trainer_cls.train(
+            train_loader, val_loader, ood_loader,
+            args.checkpoint, args.state_dict
+        )
+    else:
+        trainer_cls.train(
+            train_loader, val_loader, args.checkpoint, args.state_dict
+        )
