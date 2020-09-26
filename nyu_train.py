@@ -44,7 +44,7 @@ if __name__ == '__main__':
         'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
     ])
     parser.add_argument('--lr', default=1e-4)
-    parser.add_argument('--warmup_steps', default=1000)
+    parser.add_argument('--warmup_steps', default=1000, type=int)
     parser.add_argument('--bs', default=8, type=int, help='batch size')
     parser.add_argument(
         '--log_dir', default="", type=str,
