@@ -27,6 +27,10 @@ if __name__ == '__main__':
     )
     parser.add_argument('--zip_folder', default='data', type=str)
     parser.add_argument(
+        '--ood_zip_path', default='none', type=str,
+        help="Path to zip containing ood data (for RKL training only)"
+    )
+    parser.add_argument(
         '--checkpoint', required=True, type=str,
         help="Name of the folder to save model/trainer states to"
     )
@@ -143,7 +147,7 @@ if __name__ == '__main__':
     elif args.model_type == 'nw_prior_rkl':
         print("Performing RKL training with custom OOD data")
         ood_loader, _ = getTrainingEvalData(
-            path=args.zip_folder + '/nyu_ood_church.zip', batch_size=args.bs,
+            path=args.ood_zip_path, batch_size=args.bs,
             sanity_check=args.overfit, is_ood=True
         )
         trainer_cls = NyuRKLTrainer(

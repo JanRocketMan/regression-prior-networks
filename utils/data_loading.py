@@ -5,13 +5,14 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
-from PIL import Image
+from PIL import Image, ImageOps, ImageFile
 from zipfile import ZipFile
 from io import BytesIO
 import random
 import glob
 import pandas as pd
 
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 def _is_pil_image(img):
     return isinstance(img, Image.Image)
@@ -24,6 +25,30 @@ def _is_numpy_image(img):
 def extract_zip(input_zip):
     input_zip = ZipFile(input_zip)
     return {name: input_zip.read(name) for name in input_zip.namelist()}
+
+
+def random_crop_and_resize(image, target_shape, seed=None):
+    w, h = image.size
+    if seed is not None:
+        random.seed(seed)
+    if (h > w * target_shape[1] / target_shape[0]):
+        # Randomly crop height dimension
+        new_height = int(w * target_shape[1] / target_shape[0])
+        if new_height != h:
+            yleft = random.randrange(0, h - new_height)
+        else:
+            yleft = 0
+        return image.crop((0, yleft, w, yleft + new_height)).resize(target_shape)
+    elif (w > h * target_shape[0] / target_shape[1]):
+        # Randomly crop width dimension
+        new_width = int(h * target_shape[0] / target_shape[1])
+        if new_width != w:
+            xleft = random.randrange(0, w - new_width)
+        else:
+            xleft = 0
+        return image.crop((xleft, 0, xleft + new_width, h)).resize(target_shape)
+    else:
+        print("got here with shapes", image.size, "desired shape", target_shape)
 
 
 def load_test_data(zip_path):
@@ -126,16 +151,18 @@ def loadZipToMem(zip_file, sanity_check=False, is_ood=False):
 
 
 class depthDatasetMemory(Dataset):
-    def __init__(self, data, nyu2_train, transform=None, is_ood=False):
+    def __init__(self, data, nyu2_train, transform=None, is_ood=False, is_val=False):
         self.data, self.nyu_dataset = data, nyu2_train
         self.transform = transform
         self.is_ood = is_ood
+        self.crop_seed = 42 if is_val else None
 
     def __getitem__(self, idx):
         sample = self.nyu_dataset[idx]
         if self.is_ood:
             image = Image.open(BytesIO(self.data[sample[0]]))
-            sample = {'image': image.resize((640, 480))}
+            resized_img = random_crop_and_resize(image, (630, 470), self.crop_seed)
+            sample = {'image': ImageOps.expand(resized_img, border=5, fill='white')}
         else:
             image = Image.open(BytesIO(self.data[sample[0]]))
             depth = Image.open(BytesIO(self.data[sample[1]]))
@@ -296,7 +323,8 @@ def getTrainingEvalData(path, batch_size, sanity_check=False, is_ood=False):
         data, nyu2_train, transform=getDefaultTrainTransform(), is_ood=is_ood
     )
     transformed_val = depthDatasetMemory(
-        data, nyu2_val, transform=getNoTransform(is_val=True), is_ood=is_ood
+        data, nyu2_val, transform=getNoTransform(is_val=True), is_ood=is_ood,
+        is_val=True
     )
 
     train_loader = DataLoader(transformed_training, batch_size, shuffle=True)
