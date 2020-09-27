@@ -81,10 +81,11 @@ if __name__ == '__main__':
             )
 
     # Load model
-    channels = {
-        'l1-ssim': 1,
-        'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
-    }[args.model_type]
+    if args.model_type != 'hydra':
+        channels = {
+            'l1-ssim': 1,
+            'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
+        }[args.model_type]
     if args.model_type == 'hydra':
         channels = len(args.teacher_checkpoints) * 2
     if args.pretrained_path is None:
@@ -97,10 +98,10 @@ if __name__ == '__main__':
         loaded_densenet = densenet169(pretrained=False)
         _load_densenet_dict(loaded_densenet, args.pretrained_path)
         model.encoder.original_model = loaded_densenet.features.cuda()
-        if args.model_type == 'nw_prior_rkl':
-            # Adjust L and \beta initialization for RKL
-            model.decoder.conv3.weight[0].data.mul_(10)
-            model.decoder.conv3.weight[1].data.mul_(0.001)
+    if args.model_type == 'nw_prior_rkl':
+        # Adjust L and \beta initialization for RKL
+        model.decoder.conv3.weight[0].data.mul_(10)
+        model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
         model = ProbabilisticWrapper(Normal, model)
