@@ -196,7 +196,8 @@ class DepthDatasetKITTI(Dataset):
     def __getitem__(self, idx):
         image = Image.open(self.data[idx][0])
         if self.data[idx][1][-3:] == 'png':
-            depth = cv2.imread('/' + self.data[idx][1].split('//')[1], -1)
+            depth = cv2.imread(self.data[idx][1], -1)
+            #depth = cv2.imread('/' + self.data[idx][1].split('/')[-1], -1)
             depth = Image.fromarray(np.uint16(depth))
         else:
             depth = np.load(self.data[idx][1])

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     ])
     parser.add_argument('--bs', type=int, default=6)
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'gaussian-ensemble', 'nw_prior', 'l1-ssim'
+        'gaussian', 'gaussian-ensemble', 'nw_prior', 'l1-ssim', 'hydra'
     ])
     parser.add_argument('--targets_transform', default='scaled', choices=[
         'inverse', 'scaled'

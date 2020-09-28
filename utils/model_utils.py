@@ -64,6 +64,24 @@ def load_unet_model_from_checkpoint(
             cur_model = cur_model.module.eval().to(device)
             models.append(cur_model)
         model = GaussianEnsembleWrapper(models)
+    elif model_type == 'hydra':
+        models = []
+        ckpt_file = torch.load(checkpoints[0])
+        n_models = ckpt_file['module.decoder.conv3.weight'].size(0) // 2
+        for i in range(n_models):
+            cur_model = UNetModel(
+                backbone, pretrained=False, out_channels=2
+            ).to(device)
+            cur_model = nn.DataParallel(cur_model)
+            ckpt_file = torch.load(checkpoints[0])
+            for key in ['module.decoder.conv3.weight', 'module.decoder.conv3.bias']:
+                ckpt_file[key] = torch.cat(
+                    [ckpt_file[key][i * 2].unsqueeze(0), ckpt_file[key][i * 2 + 1].unsqueeze(0)]
+                )
+            cur_model.load_state_dict(ckpt_file)
+            cur_model = cur_model.module.eval().to(device)
+            models.append(cur_model)
+        model = GaussianEnsembleWrapper(models)
     else:
         raise ValueError("Provided model_type is not supported")
     return model.eval()
