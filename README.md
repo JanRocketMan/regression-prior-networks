@@ -73,21 +73,4 @@ Please note that by default it uses all available GPUs and requires ~18.2Gb of G
 
 - [x] Advanced visualization of results
 - [x] Training script
-- [ ] Evaluation on KITTI
-
-## Reference
-
-If you find our work useful, please cite the corresponding paper:
-
-```
-@article{RPN20,
-  author    = {Andrey Malinin, Sergey Chervontsev, Ivan Provilkov, Mark Gales},
-  title     = {Regression Prior Networks},
-  journal   = {arXiv e-prints},
-  volume    = {abs/2006.11590},
-  year      = {2020},
-  url       = {https://arxiv.org/abs/2006.11590},
-  eid       = {arXiv:2006.11590},
-  eprint    = {2006.11590}
-}
-```
+- [x] Evaluation on KITTI
