@@ -1,4 +1,4 @@
-# [Regression Prior Networks](https://arxiv.org/abs/2006.11590)
+# Regression Prior Networks
 An official PyTorch implementation of "Regression Prior Networks" for effective uncertainty estimation.
 
 ## Results
