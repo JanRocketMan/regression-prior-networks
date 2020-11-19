@@ -45,7 +45,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra', 'der'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--warmup_steps', default=1000, type=int)
