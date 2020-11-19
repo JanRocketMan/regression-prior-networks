@@ -79,7 +79,7 @@ if __name__ == '__main__':
     if args.model_type != 'hydra':
         channels = {
             'l1-ssim': 1,
-            'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
+            'gaussian': 3, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
         }[args.model_type]
     if args.model_type == 'hydra':
         channels = len(args.teacher_checkpoints) * 2
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
-        model = ProbabilisticWrapper(Normal, model)
+        model = ProbabilisticWrapper(NormalWishartPrior, model)
     elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model

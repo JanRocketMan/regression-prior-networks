@@ -7,6 +7,7 @@ import os
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from distributions.distribution_wrappers import ProbabilisticWrapper
 from utils.func_utils import AverageMeter
@@ -147,6 +148,37 @@ class SingleDistributionTrainer:
         return train_state["epoch"] + 1, train_state["global_step"]
 
 
+from torch.distributions.normal import Normal
+from torch.distributions import StudentT
+
 class NLLSingleDistributionTrainer(SingleDistributionTrainer):
     def loss_fn(self, output_distr, targets):
-        return -output_distr.log_prob(targets).mean()
+        if isinstance(output_distr, Normal):
+            return -output_distr.log_prob(targets).mean()
+        else:
+            # Sergey wrote:
+            #m, L, beta = output_distr.loc, output_distr.precision_diag, output_distr.belief.unsqueeze(-1)
+            #sos_terms = (torch.log((1 + beta) / (beta * L) + beta * (targets.unsqueeze(-1) - m).pow(2)) 
+            #              + torch.lgamma(beta / 2) - torch.lgamma(beta / 2 - 1))
+            #reg_terms = 2 * (beta + 1) * (targets.unsqueeze(-1) - m).pow(2)
+            #return (sos_terms + reg_terms).mean()
+
+            # New version
+            m, L, kappa, nu = output_distr.loc, output_distr.precision_diag, output_distr.belief.unsqueeze(-1), output_distr.df.unsqueeze(-1)
+            nll_terms = ( 0.5 * (-torch.log(kappa/np.pi)) - nu/2 * (torch.log(1 + kappa)-torch.log(L)) 
+                        + (nu/2 + 0.5) * ( -torch.log(L) + torch.log((targets.unsqueeze(-1) - m) ** 2 * kappa * L + 1 + kappa) )
+                        + torch.lgamma(nu/2) - torch.lgamma(nu/2 + 0.5) 
+                        )
+            # + (nu/2 + 0.5) * torch.log((targets.unsqueeze(-1) - m) ** 2 * kappa +  (1 + kappa) / L)
+            reg_terms = torch.abs(targets.unsqueeze(-1) - m) * (2 * kappa + nu/2)
+            
+            return (nll_terms + 0.1 * reg_terms).mean()
+
+            #Student
+            #precision_coeff = (output_distr.belief + 1) / (
+            #output_distr.belief * (output_distr.df - output_distr.dimensionality + 1))
+            #return -StudentT((output_distr.df - output_distr.dimensionality + 1).unsqueeze(-1), loc=output_distr.loc,
+            #        scale=(
+            #            precision_coeff.unsqueeze(-1) / output_distr.precision_diag
+            #        ).pow(0.5),
+            #        ).log_prob(targets.unsqueeze(-1)).mean()
