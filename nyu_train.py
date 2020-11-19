@@ -41,7 +41,7 @@ if __name__ == '__main__':
         help='number of total epochs to run'
     )
     parser.add_argument('--model_type', default='gaussian', choices=[
-        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra'
+        'gaussian', 'nw_prior', 'l1-ssim', 'nw_prior_rkl', 'nw_end', 'hydra', 'der'
     ])
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--warmup_steps', default=1000, type=int)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     if args.model_type != 'hydra':
         channels = {
             'l1-ssim': 1,
-            'gaussian': 3, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
+            'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2, 'der': 3
         }[args.model_type]
     if args.model_type == 'hydra':
         channels = len(args.teacher_checkpoints) * 2
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
-        model = ProbabilisticWrapper(NormalWishartPrior, model)
+        model = ProbabilisticWrapper(Normal, model)
     elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
@@ -108,6 +108,9 @@ if __name__ == '__main__':
         model = ProbabilisticWrapper(
             GaussianDiagonalMixture, model
         )
+    elif args.model_type == 'der':
+        model = ProbabilisticWrapper(NormalWishartPrior, model)
+    
     print("Model created")
 
     if args.teacher_checkpoints is not None:
@@ -122,7 +125,7 @@ if __name__ == '__main__':
         )
 
     # Create trainer
-    if args.model_type == 'gaussian':
+    if args.model_type == 'gaussian' or args.model_type == 'der':
         print("Training with NLL objective")
         trainer_cls = NyuNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,

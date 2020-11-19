@@ -84,7 +84,7 @@ if __name__ == '__main__':
     if args.model_type != 'hydra':
         channels = {
             'l1-ssim': 1,
-            'gaussian': 3, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2
+            'gaussian': 2, 'nw_prior': 3, 'nw_prior_rkl': 3, 'nw_end': 2, 'der': 3
         }[args.model_type]
     if args.model_type == 'hydra':
         channels = len(args.teacher_checkpoints) * 2
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         model.decoder.conv3.weight[1].data.mul_(0.001)
     model = torch.nn.DataParallel(model)
     if args.model_type == 'gaussian' or args.model_type == 'nw_end':
-        model = ProbabilisticWrapper(NormalWishartPrior, model)
+        model = ProbabilisticWrapper(Normal, model)
     elif 'nw' in args.model_type:
         model = ProbabilisticWrapper(
             NormalWishartPrior, model
@@ -113,6 +113,8 @@ if __name__ == '__main__':
         model = ProbabilisticWrapper(
             GaussianDiagonalMixture, model
         )
+    elif args.model_type == 'der':
+        model = ProbabilisticWrapper(NormalWishartPrior, model)
     print("Model created")
 
     if args.teacher_checkpoints is not None:
@@ -135,7 +137,7 @@ if __name__ == '__main__':
                 'lr': args.lr, 'amsgrad': True, 'warmup_steps': args.warmup_steps
             }
         )
-    elif args.model_type == 'gaussian':
+    elif args.model_type == 'gaussian' or args.model_type == 'der':
         print("Training with NLL objective")
         trainer_cls = KittiNLLDistributionTrainer(
             model, torch.optim.Adam, SummaryWriter, logdir,
